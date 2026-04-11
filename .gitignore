@@ -1,0 +1,21 @@
+# Xcode
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+build/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+
+# macOS
+.DS_Store
+*.dSYM.zip
+*.dSYM
+
+# Compiled
+*.o
+*.swp
+*~
