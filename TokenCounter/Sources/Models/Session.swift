@@ -1,12 +1,10 @@
 import Foundation
-import SwiftData
 
-@Model
-final class Session {
+final class Session: Codable, Identifiable {
+    var id: String { sessionId }
+
     /// Session UUID from the JSONL logs.
-    @Attribute(.unique) var sessionId: String
-
-    var project: Project?
+    var sessionId: String
 
     var startedAt: Date
     var lastActivityAt: Date
@@ -20,8 +18,11 @@ final class Session {
     /// Working directory path.
     var cwd: String?
 
-    @Relationship(deleteRule: .cascade, inverse: \Turn.session)
     var turns: [Turn] = []
+
+    private enum CodingKeys: String, CodingKey {
+        case sessionId, startedAt, lastActivityAt, gitBranch, slug, cwd, turns
+    }
 
     init(
         sessionId: String,

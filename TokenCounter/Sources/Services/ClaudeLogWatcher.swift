@@ -1,10 +1,8 @@
 import Foundation
-import SwiftData
 
 /// Watches `~/.claude/projects/` for new and modified JSONL log files.
 /// Uses DispatchSource file monitoring and periodic directory scanning
 /// to detect changes in real-time.
-@Observable
 final class ClaudeLogWatcher {
 
     /// Base directory for Claude Code project logs.
@@ -18,7 +16,10 @@ final class ClaudeLogWatcher {
     private var fileOffsets: [String: UInt64] = [:]  // file path -> last parsed offset
     private var scanTimer: DispatchSourceTimer?
     private var directoryMonitor: DispatchSourceFileSystemObject?
-    private var modelContext: ModelContext?
+    private var store: TokenStore?
+
+    /// Callback invoked on the main queue whenever new turns are ingested.
+    var onUpdate: (() -> Void)?
 
     /// Subagent metadata cache: agentId -> SubagentMeta
     private var subagentMetaCache: [String: ClaudeLogParser.SubagentMeta] = [:]
@@ -30,9 +31,9 @@ final class ClaudeLogWatcher {
     // MARK: - Public API
 
     /// Start watching for log changes. Performs an initial full scan.
-    func start(modelContext: ModelContext) {
+    func start(store: TokenStore) {
         guard !isWatching else { return }
-        self.modelContext = modelContext
+        self.store = store
         isWatching = true
 
         // Initial full scan of all existing logs
@@ -119,35 +120,19 @@ final class ClaudeLogWatcher {
         let url = URL(fileURLWithPath: filePath)
 
         guard let result = try? ClaudeLogParser.parseFile(at: url, fromOffset: offset) else { return }
-        guard !result.turns.isEmpty else {
-            fileOffsets[filePath] = result.newOffset
-            return
-        }
+        fileOffsets[filePath] = result.newOffset
+        guard !result.turns.isEmpty, let store = store else { return }
 
-        guard let context = modelContext else { return }
+        let calculator = CostCalculator()
+        let project = store.findOrCreateProject(path: projectDir)
+        let session = store.findOrCreateSession(sessionId: sessionId, in: project, firstTurn: result.turns.first)
 
-        // Ensure project exists
-        let project = findOrCreateProject(path: projectDir, context: context)
-
-        // Ensure session exists
-        let session = findOrCreateSession(
-            sessionId: sessionId,
-            project: project,
-            firstTurn: result.turns.first,
-            context: context
-        )
-
-        // Ingest turns
+        var didInsert = false
         for parsedTurn in result.turns {
-            // Check if turn already exists (dedup safety)
-            let turnId = parsedTurn.requestId
-            let descriptor = FetchDescriptor<Turn>(predicate: #Predicate { $0.uuid == turnId })
-            if let existing = try? context.fetch(descriptor), !existing.isEmpty {
-                continue
-            }
+            guard !store.hasTurn(uuid: parsedTurn.requestId) else { continue }
 
             let turn = Turn(
-                uuid: turnId,
+                uuid: parsedTurn.requestId,
                 timestamp: parsedTurn.timestamp,
                 model: parsedTurn.model,
                 provider: Provider.claude.rawValue
@@ -159,77 +144,27 @@ final class ClaudeLogWatcher {
             turn.cacheCreation5mTokens = parsedTurn.cacheCreation5mTokens
             turn.cacheCreation1hTokens = parsedTurn.cacheCreation1hTokens
             turn.isSubagent = isSubagent
-            turn.session = session
+            turn.estimatedCostUSD = calculator.cost(for: turn)
 
-            // Resolve subagent type from meta cache
             if let agentId = parsedTurn.agentId, let meta = subagentMetaCache[agentId] {
                 turn.subagentType = meta.agentType
             }
 
-            // Cost will be calculated after insertion by CostCalculator
-            context.insert(turn)
+            store.insertTurn(turn, into: session)
 
             // Update session timestamps
-            if parsedTurn.timestamp < session.startedAt {
-                session.startedAt = parsedTurn.timestamp
-            }
-            if parsedTurn.timestamp > session.lastActivityAt {
-                session.lastActivityAt = parsedTurn.timestamp
-            }
-
-            // Update session metadata from first non-nil values
-            if session.gitBranch == nil, let branch = parsedTurn.gitBranch {
-                session.gitBranch = branch
-            }
-            if session.slug == nil, let slug = parsedTurn.slug {
-                session.slug = slug
-            }
-            if session.cwd == nil, let cwd = parsedTurn.cwd {
-                session.cwd = cwd
-            }
+            if parsedTurn.timestamp < session.startedAt { session.startedAt = parsedTurn.timestamp }
+            if parsedTurn.timestamp > session.lastActivityAt { session.lastActivityAt = parsedTurn.timestamp }
+            if session.gitBranch == nil { session.gitBranch = parsedTurn.gitBranch }
+            if session.slug == nil { session.slug = parsedTurn.slug }
+            if session.cwd == nil { session.cwd = parsedTurn.cwd }
+            didInsert = true
         }
 
-        try? context.save()
-        fileOffsets[filePath] = result.newOffset
-    }
-
-    // MARK: - Model lookups
-
-    private func findOrCreateProject(path: String, context: ModelContext) -> Project {
-        let descriptor = FetchDescriptor<Project>(predicate: #Predicate { $0.path == path })
-        if let existing = try? context.fetch(descriptor).first {
-            return existing
+        if didInsert {
+            store.save()
+            DispatchQueue.main.async { self.onUpdate?() }
         }
-
-        let displayName = Project.deriveDisplayName(from: path)
-        let project = Project(path: path, displayName: displayName)
-        context.insert(project)
-        return project
-    }
-
-    private func findOrCreateSession(
-        sessionId: String,
-        project: Project,
-        firstTurn: ClaudeLogParser.ParsedTurn?,
-        context: ModelContext
-    ) -> Session {
-        let descriptor = FetchDescriptor<Session>(predicate: #Predicate { $0.sessionId == sessionId })
-        if let existing = try? context.fetch(descriptor).first {
-            return existing
-        }
-
-        let now = firstTurn.map { $0.timestamp } ?? Date()
-        let session = Session(
-            sessionId: sessionId,
-            startedAt: now,
-            lastActivityAt: now,
-            gitBranch: firstTurn?.gitBranch,
-            slug: firstTurn?.slug,
-            cwd: firstTurn?.cwd
-        )
-        session.project = project
-        context.insert(session)
-        return session
     }
 
     // MARK: - Periodic scanning

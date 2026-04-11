@@ -154,7 +154,7 @@ struct ClaudeLogParser {
             orderByRequestId[dedupKey] = lineIndex
         }
 
-        // Convert to ParsedTurns, sorted by line order
+        // Convert to ParsedTurns, sorted by first line order (stable key ordering)
         let sortedKeys = lastByRequestId.keys.sorted { (orderByRequestId[$0] ?? 0) < (orderByRequestId[$1] ?? 0) }
 
         let turns: [ParsedTurn] = sortedKeys.compactMap { key in
@@ -189,7 +189,8 @@ struct ClaudeLogParser {
             )
         }
 
-        return (turns, fileSize)
+        // Sort by timestamp for consistent chronological ordering
+        return (turns.sorted { $0.timestamp < $1.timestamp }, fileSize)
     }
 
     /// Parse a subagent meta.json file.

@@ -1,127 +1,104 @@
-import XCTest
+import Testing
+import Foundation
 @testable import TokenCounter
 
-final class ClaudeLogParserTests: XCTestCase {
+struct ClaudeLogParserTests {
 
-    var fixtureURL: URL!
-
-    override func setUp() {
-        super.setUp()
-        fixtureURL = Bundle.module.url(forResource: "sample-session", withExtension: "jsonl")!
+    private var fixtureURL: URL {
+        Bundle.module.url(forResource: "sample-session", withExtension: "jsonl")!
     }
 
-    // MARK: - Deduplication tests
+    // MARK: - Deduplication
 
-    func testDeduplicatesByRequestId() throws {
+    @Test func deduplicatesByRequestId() throws {
         let result = try ClaudeLogParser.parseFile(at: fixtureURL)
-
-        // req_test1 has 3 streaming chunks (assist-001a, 001b, 001c) -> should produce 1 turn
-        // req_test2 has 1 line -> 1 turn
-        // req_sub1 has 1 line -> 1 turn
-        XCTAssertEqual(result.turns.count, 3, "Should have 3 turns after deduplication")
+        // req_test1 has 3 streaming chunks -> 1 turn; req_test2 -> 1; req_sub1 -> 1
+        #expect(result.turns.count == 3)
     }
 
-    func testKeepsLastStreamingChunk() throws {
+    @Test func keepsLastStreamingChunk() throws {
         let result = try ClaudeLogParser.parseFile(at: fixtureURL)
-
-        // req_test1's last chunk has output_tokens=150
         let turn1 = result.turns.first { $0.requestId == "req_test1" }
-        XCTAssertNotNil(turn1)
-        XCTAssertEqual(turn1?.outputTokens, 150, "Should keep the last chunk's output_tokens (150)")
-        XCTAssertEqual(turn1?.inputTokens, 3)
-        XCTAssertEqual(turn1?.cacheCreationTokens, 1000)
+        #expect(turn1 != nil)
+        #expect(turn1?.outputTokens == 150)  // last chunk has 150
+        #expect(turn1?.inputTokens == 3)
+        #expect(turn1?.cacheCreationTokens == 1000)
     }
 
     // MARK: - Token field extraction
 
-    func testExtractsAllTokenFields() throws {
+    @Test func extractsAllTokenFields() throws {
         let result = try ClaudeLogParser.parseFile(at: fixtureURL)
-
         let turn2 = result.turns.first { $0.requestId == "req_test2" }
-        XCTAssertNotNil(turn2)
-        XCTAssertEqual(turn2?.inputTokens, 10)
-        XCTAssertEqual(turn2?.outputTokens, 300)
-        XCTAssertEqual(turn2?.cacheCreationTokens, 200)
-        XCTAssertEqual(turn2?.cacheReadTokens, 800)
-        XCTAssertEqual(turn2?.cacheCreation5mTokens, 200)
-        XCTAssertEqual(turn2?.cacheCreation1hTokens, 0)
+        #expect(turn2 != nil)
+        #expect(turn2?.inputTokens == 10)
+        #expect(turn2?.outputTokens == 300)
+        #expect(turn2?.cacheCreationTokens == 200)
+        #expect(turn2?.cacheReadTokens == 800)
+        #expect(turn2?.cacheCreation5mTokens == 200)
+        #expect(turn2?.cacheCreation1hTokens == 0)
     }
 
-    func testExtractsModel() throws {
+    @Test func extractsModel() throws {
         let result = try ClaudeLogParser.parseFile(at: fixtureURL)
-
         let turn1 = result.turns.first { $0.requestId == "req_test1" }
-        XCTAssertEqual(turn1?.model, "claude-opus-4-6")
-
+        #expect(turn1?.model == "claude-opus-4-6")
         let subTurn = result.turns.first { $0.requestId == "req_sub1" }
-        XCTAssertEqual(subTurn?.model, "claude-haiku-4-5-20251001")
+        #expect(subTurn?.model == "claude-haiku-4-5-20251001")
     }
 
     // MARK: - Subagent detection
 
-    func testDetectsSubagentTurns() throws {
+    @Test func detectsSubagentTurns() throws {
         let result = try ClaudeLogParser.parseFile(at: fixtureURL)
-
         let subTurn = result.turns.first { $0.requestId == "req_sub1" }
-        XCTAssertNotNil(subTurn)
-        XCTAssertTrue(subTurn?.isSubagent ?? false, "Sidechain turn should be marked as subagent")
-        XCTAssertEqual(subTurn?.agentId, "agent-sub-001")
-
+        #expect(subTurn != nil)
+        #expect(subTurn?.isSubagent == true)
+        #expect(subTurn?.agentId == "agent-sub-001")
         let mainTurn = result.turns.first { $0.requestId == "req_test1" }
-        XCTAssertFalse(mainTurn?.isSubagent ?? true, "Non-sidechain turn should not be marked as subagent")
+        #expect(mainTurn?.isSubagent == false)
     }
 
     // MARK: - Metadata extraction
 
-    func testExtractsSessionMetadata() throws {
+    @Test func extractsSessionMetadata() throws {
         let result = try ClaudeLogParser.parseFile(at: fixtureURL)
-
-        let turn = result.turns.first!
-        XCTAssertEqual(turn.sessionId, "test-session-001")
-        XCTAssertEqual(turn.gitBranch, "main")
-        XCTAssertEqual(turn.slug, "test-session")
-        XCTAssertEqual(turn.cwd, "/home/user/test")
+        let turn = try #require(result.turns.first)
+        #expect(turn.sessionId == "test-session-001")
+        #expect(turn.gitBranch == "main")
+        #expect(turn.slug == "test-session")
+        #expect(turn.cwd == "/home/user/test")
     }
 
-    // MARK: - Timestamp parsing
+    // MARK: - Timestamps
 
-    func testParsesTimestamps() throws {
+    @Test func parsesTimestampsInOrder() throws {
         let result = try ClaudeLogParser.parseFile(at: fixtureURL)
-
-        let turn1 = result.turns.first { $0.requestId == "req_test1" }
-        XCTAssertNotNil(turn1?.timestamp)
-
-        // Verify correct ordering
         let timestamps = result.turns.map(\.timestamp)
-        let sorted = timestamps.sorted()
-        XCTAssertEqual(timestamps, sorted, "Turns should be in chronological order")
+        #expect(timestamps == timestamps.sorted())
     }
 
     // MARK: - Incremental parsing
 
-    func testIncrementalParsing() throws {
-        // Parse full file first
+    @Test func incrementalParsing() throws {
         let fullResult = try ClaudeLogParser.parseFile(at: fixtureURL)
-        XCTAssertGreaterThan(fullResult.newOffset, 0)
-
-        // Parsing from end offset should return no new turns
-        let incrementalResult = try ClaudeLogParser.parseFile(at: fixtureURL, fromOffset: fullResult.newOffset)
-        XCTAssertEqual(incrementalResult.turns.count, 0, "No new turns after full parse")
+        #expect(fullResult.newOffset > 0)
+        let incResult = try ClaudeLogParser.parseFile(at: fixtureURL, fromOffset: fullResult.newOffset)
+        #expect(incResult.turns.count == 0)
     }
 
     // MARK: - Edge cases
 
-    func testHandlesEmptyFile() throws {
-        let tmpURL = FileManager.default.temporaryDirectory.appendingPathComponent("empty.jsonl")
+    @Test func handlesEmptyFile() throws {
+        let tmpURL = FileManager.default.temporaryDirectory.appendingPathComponent("tc_empty_\(UUID().uuidString).jsonl")
         FileManager.default.createFile(atPath: tmpURL.path, contents: Data())
         defer { try? FileManager.default.removeItem(at: tmpURL) }
-
         let result = try ClaudeLogParser.parseFile(at: tmpURL)
-        XCTAssertEqual(result.turns.count, 0)
+        #expect(result.turns.count == 0)
     }
 
-    func testSkipsMalformedLines() throws {
-        let tmpURL = FileManager.default.temporaryDirectory.appendingPathComponent("malformed.jsonl")
+    @Test func skipsMalformedLines() throws {
+        let tmpURL = FileManager.default.temporaryDirectory.appendingPathComponent("tc_malformed_\(UUID().uuidString).jsonl")
         let content = """
         not valid json
         {"type":"assistant","message":{"model":"claude-opus-4-6","role":"assistant","usage":{"input_tokens":5,"output_tokens":10,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}},"requestId":"req_good","uuid":"good-uuid","timestamp":"2026-04-11T11:42:10.000Z","sessionId":"test"}
@@ -129,20 +106,14 @@ final class ClaudeLogParserTests: XCTestCase {
         """
         try content.write(to: tmpURL, atomically: true, encoding: .utf8)
         defer { try? FileManager.default.removeItem(at: tmpURL) }
-
         let result = try ClaudeLogParser.parseFile(at: tmpURL)
-        XCTAssertEqual(result.turns.count, 1, "Should parse the one valid line and skip malformed ones")
+        #expect(result.turns.count == 1)
     }
 
-    // MARK: - Filters non-assistant lines
-
-    func testFiltersNonAssistantLines() throws {
+    @Test func filtersNonAssistantLines() throws {
         let result = try ClaudeLogParser.parseFile(at: fixtureURL)
-
-        // The fixture has queue-operation and user lines that should be filtered out
-        // Only assistant lines with usage should be counted
         for turn in result.turns {
-            XCTAssertFalse(turn.model.isEmpty, "All parsed turns should have a model")
+            #expect(!turn.model.isEmpty)
         }
     }
 }

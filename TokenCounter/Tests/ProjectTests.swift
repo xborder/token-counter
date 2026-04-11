@@ -1,30 +1,25 @@
-import XCTest
+import Testing
 @testable import TokenCounter
 
-final class ProjectTests: XCTestCase {
+struct ProjectTests {
 
-    func testDeriveDisplayName_standardPath() {
-        let name = Project.deriveDisplayName(from: "-home-user-token-counter")
-        XCTAssertEqual(name, "token-counter")
+    @Test func standardPath() {
+        #expect(Project.deriveDisplayName(from: "-home-user-token-counter") == "token-counter")
     }
 
-    func testDeriveDisplayName_rootPath() {
-        let name = Project.deriveDisplayName(from: "-root-my-project")
-        XCTAssertEqual(name, "my-project")
+    @Test func rootPath() {
+        #expect(Project.deriveDisplayName(from: "-root-my-project") == "my-project")
     }
 
-    func testDeriveDisplayName_usersPath() {
-        let name = Project.deriveDisplayName(from: "-Users-charlie-code-my-app")
-        XCTAssertEqual(name, "code-my-app")
+    @Test func usersPath() {
+        #expect(Project.deriveDisplayName(from: "-Users-charlie-code-my-app") == "code-my-app")
     }
 
-    func testDeriveDisplayName_simpleName() {
-        let name = Project.deriveDisplayName(from: "project")
-        XCTAssertEqual(name, "project")
+    @Test func simpleName() {
+        #expect(Project.deriveDisplayName(from: "project") == "project")
     }
 
-    func testDeriveDisplayName_singleDash() {
-        let name = Project.deriveDisplayName(from: "-tmp-build")
-        XCTAssertEqual(name, "build")
+    @Test func singleDash() {
+        #expect(Project.deriveDisplayName(from: "-tmp-build") == "build")
     }
 }

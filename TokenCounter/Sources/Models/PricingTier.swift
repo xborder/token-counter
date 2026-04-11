@@ -1,10 +1,9 @@
 import Foundation
-import SwiftData
 
-@Model
-final class PricingTier {
-    /// Model identifier, e.g. "claude-opus-4-6".
-    @Attribute(.unique) var model: String
+final class PricingTier: Codable, Identifiable {
+    var id: String { model }
+
+    var model: String
 
     /// Provider: "claude" or "openai".
     var provider: String

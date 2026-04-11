@@ -1,15 +1,13 @@
 import Foundation
-import SwiftData
 
 /// Central repository for querying aggregated token usage data.
 /// Provides filtered and grouped queries for ViewModels.
-@Observable
 final class TokenUsageRepository {
 
-    private var modelContext: ModelContext
+    private var store: TokenStore
 
-    init(modelContext: ModelContext) {
-        self.modelContext = modelContext
+    init(store: TokenStore) {
+        self.store = store
     }
 
     // MARK: - Time range
@@ -106,8 +104,7 @@ final class TokenUsageRepository {
 
     /// Fetch all projects with their sessions.
     func projects(for timeRange: TimeRange) -> [Project] {
-        let descriptor = FetchDescriptor<Project>(sortBy: [SortDescriptor(\.displayName)])
-        return (try? modelContext.fetch(descriptor)) ?? []
+        store.projects.values.sorted { $0.displayName < $1.displayName }
     }
 
     /// Fetch sessions for a project, filtered by time range.
@@ -129,14 +126,7 @@ final class TokenUsageRepository {
     // MARK: - Private
 
     private func fetchTurns(for timeRange: TimeRange) -> [Turn] {
-        if let startDate = timeRange.startDate {
-            let descriptor = FetchDescriptor<Turn>(
-                predicate: #Predicate { $0.timestamp >= startDate }
-            )
-            return (try? modelContext.fetch(descriptor)) ?? []
-        } else {
-            let descriptor = FetchDescriptor<Turn>()
-            return (try? modelContext.fetch(descriptor)) ?? []
-        }
+        guard let startDate = timeRange.startDate else { return store.allTurns }
+        return store.allTurns.filter { $0.timestamp >= startDate }
     }
 }

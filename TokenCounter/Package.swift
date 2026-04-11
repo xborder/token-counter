@@ -10,6 +10,9 @@ let package = Package(
     products: [
         .executable(name: "TokenCounter", targets: ["TokenCounter"])
     ],
+    dependencies: [
+        .package(url: "https://github.com/swiftlang/swift-testing.git", from: "0.10.0"),
+    ],
     targets: [
         .executableTarget(
             name: "TokenCounter",
@@ -21,7 +24,10 @@ let package = Package(
         ),
         .testTarget(
             name: "TokenCounterTests",
-            dependencies: ["TokenCounter"],
+            dependencies: [
+                "TokenCounter",
+                .product(name: "Testing", package: "swift-testing"),
+            ],
             path: "Tests",
             resources: [
                 .process("Fixtures")

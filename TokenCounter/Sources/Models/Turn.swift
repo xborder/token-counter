@@ -1,12 +1,10 @@
 import Foundation
-import SwiftData
 
-@Model
-final class Turn {
-    /// Unique identifier from the JSONL line — used for deduplication.
-    @Attribute(.unique) var uuid: String
+final class Turn: Codable, Identifiable {
+    var id: String { uuid }
 
-    var session: Session?
+    /// Unique identifier (requestId) from JSONL — used for deduplication.
+    var uuid: String
 
     var timestamp: Date
 

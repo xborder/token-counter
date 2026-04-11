@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 import SwiftUI
 
 /// ViewModel for the menu bar popover. Drives all UI state.
@@ -26,8 +25,8 @@ final class MenuBarViewModel {
 
     // MARK: - Setup
 
-    func configure(modelContext: ModelContext) {
-        self.repository = TokenUsageRepository(modelContext: modelContext)
+    func configure(store: TokenStore) {
+        self.repository = TokenUsageRepository(store: store)
         refresh()
         startAutoRefresh()
     }

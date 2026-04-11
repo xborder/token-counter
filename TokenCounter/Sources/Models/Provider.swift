@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 
 /// Token provider (Claude/Anthropic or OpenAI/Codex).
 enum Provider: String, Codable, CaseIterable, Identifiable {
