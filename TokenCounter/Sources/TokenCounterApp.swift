@@ -3,22 +3,40 @@ import SwiftUI
 @main
 struct TokenCounterApp: App {
 
-    private let store = TokenStore()
-    @State private var viewModel = MenuBarViewModel()
-    @State private var logWatcher = ClaudeLogWatcher()
+    // AppController is a reference type so it initializes once and starts
+    // the log watcher eagerly at app launch — not waiting for the first popover open.
+    @State private var controller = AppController()
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarPopover(viewModel: viewModel)
-                .onAppear {
-                    viewModel.configure(store: store)
-                    logWatcher.onUpdate = { [self] in viewModel.refresh() }
-                    logWatcher.start(store: store)
-                }
+            MenuBarPopover(viewModel: controller.viewModel)
         } label: {
-            Image(systemName: "sum")
-                .symbolRenderingMode(.hierarchical)
+            MenuBarIcon()
         }
         .menuBarExtraStyle(.window)
+    }
+}
+
+/// Holds all app state. Initialized once at launch; starts the log watcher immediately.
+@Observable
+final class AppController {
+    let store = TokenStore()
+    let viewModel = MenuBarViewModel()
+    let logWatcher = ClaudeLogWatcher()
+
+    init() {
+        viewModel.configure(store: store)
+        logWatcher.onUpdate = { [weak self] in
+            self?.viewModel.refresh()
+        }
+        logWatcher.start(store: store)
+    }
+}
+
+/// A distinctive, legible menu bar icon.
+struct MenuBarIcon: View {
+    var body: some View {
+        Image(systemName: "t.circle.fill")
+            .font(.system(size: 14, weight: .medium))
     }
 }
