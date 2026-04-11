@@ -36,6 +36,16 @@ final class TokenUsageRepository {
         }
     }
 
+    // MARK: - Provider filter
+
+    enum ProviderFilter: String, CaseIterable, Identifiable {
+        case all = "All"
+        case claude = "Claude"
+        case openai = "OpenAI"
+
+        var id: String { rawValue }
+    }
+
     // MARK: - Aggregated stats
 
     struct UsageSummary {
@@ -43,6 +53,8 @@ final class TokenUsageRepository {
         var outputTokens: Int = 0
         var cacheCreationTokens: Int = 0
         var cacheReadTokens: Int = 0
+        var reasoningTokens: Int = 0
+        var cachedPromptTokens: Int = 0
         var totalTokens: Int = 0
         var estimatedCost: Double = 0
         var cacheSavings: Double = 0
@@ -56,6 +68,8 @@ final class TokenUsageRepository {
         var outputTokens: Int = 0
         var cacheCreationTokens: Int = 0
         var cacheReadTokens: Int = 0
+        var reasoningTokens: Int = 0
+        var cachedPromptTokens: Int = 0
         var totalTokens: Int = 0
         var estimatedCost: Double = 0
         var turnCount: Int = 0
@@ -63,9 +77,9 @@ final class TokenUsageRepository {
         var id: String { model }
     }
 
-    /// Fetch overall usage summary for a time range.
-    func summary(for timeRange: TimeRange) -> UsageSummary {
-        let turns = fetchTurns(for: timeRange)
+    /// Fetch overall usage summary for a time range and optional provider filter.
+    func summary(for timeRange: TimeRange, provider: ProviderFilter = .all) -> UsageSummary {
+        let turns = fetchTurns(for: timeRange, provider: provider)
         let calculator = CostCalculator()
 
         var summary = UsageSummary()
@@ -74,6 +88,8 @@ final class TokenUsageRepository {
             summary.outputTokens += turn.outputTokens
             summary.cacheCreationTokens += turn.cacheCreationTokens
             summary.cacheReadTokens += turn.cacheReadTokens
+            summary.reasoningTokens += turn.reasoningTokens
+            summary.cachedPromptTokens += turn.cachedPromptTokens
             summary.totalTokens += turn.totalTokens
             summary.estimatedCost += turn.estimatedCostUSD
             summary.cacheSavings += calculator.cacheSavings(for: turn)
@@ -82,9 +98,9 @@ final class TokenUsageRepository {
         return summary
     }
 
-    /// Fetch per-model usage breakdown for a time range.
-    func modelBreakdown(for timeRange: TimeRange) -> [ModelUsage] {
-        let turns = fetchTurns(for: timeRange)
+    /// Fetch per-model usage breakdown for a time range and optional provider filter.
+    func modelBreakdown(for timeRange: TimeRange, provider: ProviderFilter = .all) -> [ModelUsage] {
+        let turns = fetchTurns(for: timeRange, provider: provider)
         var byModel: [String: ModelUsage] = [:]
 
         for turn in turns {
@@ -93,6 +109,8 @@ final class TokenUsageRepository {
             usage.outputTokens += turn.outputTokens
             usage.cacheCreationTokens += turn.cacheCreationTokens
             usage.cacheReadTokens += turn.cacheReadTokens
+            usage.reasoningTokens += turn.reasoningTokens
+            usage.cachedPromptTokens += turn.cachedPromptTokens
             usage.totalTokens += turn.totalTokens
             usage.estimatedCost += turn.estimatedCostUSD
             usage.turnCount += 1
@@ -125,8 +143,18 @@ final class TokenUsageRepository {
 
     // MARK: - Private
 
-    private func fetchTurns(for timeRange: TimeRange) -> [Turn] {
-        guard let startDate = timeRange.startDate else { return store.allTurns }
-        return store.allTurns.filter { $0.timestamp >= startDate }
+    private func fetchTurns(for timeRange: TimeRange, provider: ProviderFilter = .all) -> [Turn] {
+        var turns = store.allTurns
+        if let startDate = timeRange.startDate {
+            turns = turns.filter { $0.timestamp >= startDate }
+        }
+        switch provider {
+        case .all:
+            return turns
+        case .claude:
+            return turns.filter { $0.provider == Provider.claude.rawValue }
+        case .openai:
+            return turns.filter { $0.provider == Provider.openai.rawValue }
+        }
     }
 }

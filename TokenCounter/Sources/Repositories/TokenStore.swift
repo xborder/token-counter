@@ -67,6 +67,23 @@ final class TokenStore {
         return s
     }
 
+    func findOrCreateCodexProject() -> Project {
+        findOrCreateProject(path: "_codex-cli")
+    }
+
+    func findOrCreateCodexSession(sessionId: String, in project: Project, timestamp: Date, sessionDate: String) -> Session {
+        let fullId = "codex-\(sessionId)"
+        if let s = project.sessions.first(where: { $0.sessionId == fullId }) { return s }
+        let s = Session(
+            sessionId: fullId,
+            startedAt: timestamp,
+            lastActivityAt: timestamp,
+            slug: "codex-\(sessionDate.replacingOccurrences(of: "/", with: "-"))"
+        )
+        project.sessions.append(s)
+        return s
+    }
+
     func insertTurn(_ turn: Turn, into session: Session) {
         guard turnIndex[turn.uuid] == nil else { return }
         session.turns.append(turn)

@@ -17,6 +17,19 @@ struct SummaryHeaderView: View {
                 viewModel.selectTimeRange(newValue)
             }
 
+            // Provider filter pills
+            HStack(spacing: 6) {
+                ForEach(TokenUsageRepository.ProviderFilter.allCases) { filter in
+                    ProviderPill(
+                        label: filter.rawValue,
+                        isSelected: viewModel.selectedProvider == filter
+                    ) {
+                        viewModel.selectProvider(filter)
+                    }
+                }
+                Spacer()
+            }
+
             // Summary cards
             HStack(spacing: 12) {
                 SummaryCard(
@@ -32,6 +45,27 @@ struct SummaryHeaderView: View {
                 )
             }
         }
+    }
+}
+
+struct ProviderPill: View {
+    let label: String
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            Text(label)
+                .font(.caption2)
+                .fontWeight(isSelected ? .semibold : .regular)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
+                .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                .clipShape(Capsule())
+                .overlay(Capsule().strokeBorder(isSelected ? Color.accentColor.opacity(0.4) : Color.secondary.opacity(0.3), lineWidth: 0.5))
+        }
+        .buttonStyle(.plain)
     }
 }
 

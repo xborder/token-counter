@@ -3,6 +3,7 @@ import SwiftUI
 /// Settings sheet accessible from the popover footer.
 struct SettingsView: View {
     @AppStorage("logBasePath") private var logBasePath = ClaudeLogWatcher.defaultBasePath
+    @AppStorage("codexLogBasePath") private var codexLogBasePath = CodexLogWatcher.defaultBasePath
     @AppStorage("refreshInterval") private var refreshInterval: Double = 5.0
     @AppStorage("launchAtLogin") private var launchAtLogin = false
 
@@ -25,6 +26,24 @@ struct SettingsView: View {
                         .font(.caption)
 
                     Text("Default: ~/.claude/projects")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(4)
+            }
+
+            // Codex CLI log directory
+            GroupBox("Codex CLI Logs") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Log directory path:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    TextField("Path", text: $codexLogBasePath)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.caption)
+
+                    Text("Default: ~/.codex/sessions")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -62,6 +81,6 @@ struct SettingsView: View {
             }
         }
         .padding()
-        .frame(width: 280, height: 320)
+        .frame(width: 280, height: 420)
     }
 }

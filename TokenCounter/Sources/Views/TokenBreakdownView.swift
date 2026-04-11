@@ -39,6 +39,24 @@ struct TokenBreakdownView: View {
                     color: .purple,
                     total: maxTokens
                 )
+
+                if summary.reasoningTokens > 0 {
+                    TokenRow(
+                        label: "Reasoning",
+                        tokens: summary.reasoningTokens,
+                        color: .pink,
+                        total: maxTokens
+                    )
+                }
+
+                if summary.cachedPromptTokens > 0 {
+                    TokenRow(
+                        label: "Cached Prompt",
+                        tokens: summary.cachedPromptTokens,
+                        color: .cyan,
+                        total: maxTokens
+                    )
+                }
             }
         }
         .padding(.vertical, 4)
@@ -50,6 +68,8 @@ struct TokenBreakdownView: View {
             summary.outputTokens,
             summary.cacheCreationTokens,
             summary.cacheReadTokens,
+            summary.reasoningTokens,
+            summary.cachedPromptTokens,
             1
         )
     }

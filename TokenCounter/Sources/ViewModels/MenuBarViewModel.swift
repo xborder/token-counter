@@ -8,6 +8,7 @@ final class MenuBarViewModel {
     // MARK: - State
 
     var selectedTimeRange: TokenUsageRepository.TimeRange = .today
+    var selectedProvider: TokenUsageRepository.ProviderFilter = .all
     var summary: TokenUsageRepository.UsageSummary = .init()
     var modelBreakdown: [TokenUsageRepository.ModelUsage] = []
     var projects: [Project] = []
@@ -36,14 +37,19 @@ final class MenuBarViewModel {
     func refresh() {
         guard let repository else { return }
 
-        summary = repository.summary(for: selectedTimeRange)
-        modelBreakdown = repository.modelBreakdown(for: selectedTimeRange)
+        summary = repository.summary(for: selectedTimeRange, provider: selectedProvider)
+        modelBreakdown = repository.modelBreakdown(for: selectedTimeRange, provider: selectedProvider)
         projects = repository.projects(for: selectedTimeRange)
         lastUpdated = Date()
     }
 
     func selectTimeRange(_ range: TokenUsageRepository.TimeRange) {
         selectedTimeRange = range
+        refresh()
+    }
+
+    func selectProvider(_ provider: TokenUsageRepository.ProviderFilter) {
+        selectedProvider = provider
         refresh()
     }
 

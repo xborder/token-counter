@@ -58,6 +58,19 @@ struct CostCalculator {
             cacheCreationPricePer1M: 0,
             cacheReadPricePer1M: 0.075
         ),
+        // Codex CLI models
+        "codex": ModelPricing(
+            inputPricePer1M: 2.50,
+            outputPricePer1M: 10.0,
+            cacheCreationPricePer1M: 0,
+            cacheReadPricePer1M: 1.25
+        ),
+        "codex-mini": ModelPricing(
+            inputPricePer1M: 0.15,
+            outputPricePer1M: 0.60,
+            cacheCreationPricePer1M: 0,
+            cacheReadPricePer1M: 0.075
+        ),
     ]
 
     /// User overrides loaded from settings (model -> pricing).

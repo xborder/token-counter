@@ -48,6 +48,20 @@
       "output": 0.60,
       "cache_creation": 0,
       "cache_read": 0.075
+    },
+    "codex": {
+      "provider": "openai",
+      "input": 2.50,
+      "output": 10.00,
+      "cache_creation": 0,
+      "cache_read": 1.25
+    },
+    "codex-mini": {
+      "provider": "openai",
+      "input": 0.15,
+      "output": 0.60,
+      "cache_creation": 0,
+      "cache_read": 0.075
     }
   }
 }

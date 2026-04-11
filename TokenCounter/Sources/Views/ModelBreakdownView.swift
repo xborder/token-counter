@@ -67,6 +67,12 @@ struct ModelRow: View {
                     ModelDetailRow(label: "Output", value: FormatHelpers.formatTokens(usage.outputTokens))
                     ModelDetailRow(label: "Cache Create", value: FormatHelpers.formatTokens(usage.cacheCreationTokens))
                     ModelDetailRow(label: "Cache Read", value: FormatHelpers.formatTokens(usage.cacheReadTokens))
+                    if usage.reasoningTokens > 0 {
+                        ModelDetailRow(label: "Reasoning", value: FormatHelpers.formatTokens(usage.reasoningTokens))
+                    }
+                    if usage.cachedPromptTokens > 0 {
+                        ModelDetailRow(label: "Cached Prompt", value: FormatHelpers.formatTokens(usage.cachedPromptTokens))
+                    }
                     ModelDetailRow(label: "Turns", value: "\(usage.turnCount)")
                 }
                 .padding(.leading, 22)

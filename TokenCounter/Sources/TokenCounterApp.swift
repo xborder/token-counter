@@ -22,14 +22,18 @@ struct TokenCounterApp: App {
 final class AppController {
     let store = TokenStore()
     let viewModel = MenuBarViewModel()
-    let logWatcher = ClaudeLogWatcher()
+    let claudeWatcher = ClaudeLogWatcher()
+    let codexWatcher = CodexLogWatcher()
 
     init() {
         viewModel.configure(store: store)
-        logWatcher.onUpdate = { [weak self] in
+        let refreshCallback: () -> Void = { [weak self] in
             self?.viewModel.refresh()
         }
-        logWatcher.start(store: store)
+        claudeWatcher.onUpdate = refreshCallback
+        codexWatcher.onUpdate = refreshCallback
+        claudeWatcher.start(store: store)
+        codexWatcher.start(store: store)
     }
 }
 
