@@ -86,6 +86,18 @@ struct SessionRow: View {
     @Bindable var viewModel: MenuBarViewModel
     let isExpanded: Bool
 
+    private var filteredTurns: [Turn] {
+        viewModel.turns(for: session)
+    }
+
+    private var filteredCost: Double {
+        filteredTurns.reduce(0) { $0 + $1.estimatedCostUSD }
+    }
+
+    private var filteredTokens: Int {
+        filteredTurns.reduce(0) { $0 + $1.totalTokens }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
@@ -122,10 +134,10 @@ struct SessionRow: View {
                     Spacer()
 
                     VStack(alignment: .trailing, spacing: 1) {
-                        Text(FormatHelpers.formatCost(session.totalEstimatedCost))
+                        Text(FormatHelpers.formatCost(filteredCost))
                             .font(.caption)
                             .monospacedDigit()
-                        Text(FormatHelpers.formatTokensCompact(session.totalTokens) + " tokens")
+                        Text(FormatHelpers.formatTokensCompact(filteredTokens) + " tokens")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
@@ -136,7 +148,7 @@ struct SessionRow: View {
             .padding(.vertical, 3)
 
             if isExpanded {
-                TurnListView(turns: viewModel.turns(for: session))
+                TurnListView(turns: filteredTurns)
                     .padding(.leading, 16)
             }
         }

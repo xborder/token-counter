@@ -21,9 +21,9 @@ struct TokenBreakdownView: View {
                 )
 
                 TokenRow(
-                    label: "Output",
-                    tokens: summary.outputTokens,
-                    cost: summary.outputCost,
+                    label: summary.reasoningTokens > 0 ? "Output (non-reasoning)" : "Output",
+                    tokens: summary.outputTokens - summary.reasoningTokens,
+                    cost: summary.outputCost - summary.reasoningCost,
                     color: .green,
                     total: maxTokens
                 )
@@ -71,7 +71,7 @@ struct TokenBreakdownView: View {
     private var maxTokens: Int {
         max(
             summary.inputTokens,
-            summary.outputTokens,
+            summary.outputTokens - summary.reasoningTokens,
             summary.cacheCreationTokens,
             summary.cacheReadTokens,
             summary.reasoningTokens,

@@ -98,16 +98,22 @@ final class TokenUsageRepository {
             summary.reasoningTokens += turn.reasoningTokens
             summary.cachedPromptTokens += turn.cachedPromptTokens
             summary.totalTokens += turn.totalTokens
-            summary.estimatedCost += turn.estimatedCostUSD
             summary.cacheSavings += calculator.cacheSavings(for: turn)
             summary.turnCount += 1
 
             if let pricing = calculator.pricing(for: turn.model) {
-                summary.inputCost += Double(turn.inputTokens) * pricing.inputPricePer1M / 1_000_000
-                summary.outputCost += Double(turn.outputTokens) * pricing.outputPricePer1M / 1_000_000
-                summary.cacheCreationCost += Double(turn.cacheCreationTokens) * pricing.cacheCreationPricePer1M / 1_000_000
-                summary.cacheReadCost += Double(turn.cacheReadTokens) * pricing.cacheReadPricePer1M / 1_000_000
+                let inputCost = Double(turn.inputTokens) * pricing.inputPricePer1M / 1_000_000
+                let outputCost = Double(turn.outputTokens) * pricing.outputPricePer1M / 1_000_000
+                let cacheCreationCost = Double(turn.cacheCreationTokens) * pricing.cacheCreationPricePer1M / 1_000_000
+                let cacheReadCost = Double(turn.cacheReadTokens) * pricing.cacheReadPricePer1M / 1_000_000
+                summary.inputCost += inputCost
+                summary.outputCost += outputCost
+                summary.cacheCreationCost += cacheCreationCost
+                summary.cacheReadCost += cacheReadCost
                 summary.reasoningCost += Double(turn.reasoningTokens) * pricing.outputPricePer1M / 1_000_000
+                summary.estimatedCost += inputCost + outputCost + cacheCreationCost + cacheReadCost
+            } else {
+                summary.estimatedCost += turn.estimatedCostUSD
             }
         }
         return summary
@@ -116,6 +122,7 @@ final class TokenUsageRepository {
     /// Fetch per-model usage breakdown for a time range and optional provider filter.
     func modelBreakdown(for timeRange: TimeRange, provider: ProviderFilter = .all) -> [ModelUsage] {
         let turns = fetchTurns(for: timeRange, provider: provider)
+        let calculator = CostCalculator()
         var byModel: [String: ModelUsage] = [:]
 
         for turn in turns {
@@ -127,7 +134,14 @@ final class TokenUsageRepository {
             usage.reasoningTokens += turn.reasoningTokens
             usage.cachedPromptTokens += turn.cachedPromptTokens
             usage.totalTokens += turn.totalTokens
-            usage.estimatedCost += turn.estimatedCostUSD
+            if let pricing = calculator.pricing(for: turn.model) {
+                usage.estimatedCost += Double(turn.inputTokens) * pricing.inputPricePer1M / 1_000_000
+                    + Double(turn.outputTokens) * pricing.outputPricePer1M / 1_000_000
+                    + Double(turn.cacheCreationTokens) * pricing.cacheCreationPricePer1M / 1_000_000
+                    + Double(turn.cacheReadTokens) * pricing.cacheReadPricePer1M / 1_000_000
+            } else {
+                usage.estimatedCost += turn.estimatedCostUSD
+            }
             usage.turnCount += 1
             byModel[turn.model] = usage
         }
