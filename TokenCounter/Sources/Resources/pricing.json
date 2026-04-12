@@ -1,0 +1,81 @@
+{
+  "models": {
+    "claude-opus-4-6": {
+      "provider": "claude",
+      "input": 15.00,
+      "output": 75.00,
+      "cache_creation": 18.75,
+      "cache_read": 1.50
+    },
+    "claude-sonnet-4-6": {
+      "provider": "claude",
+      "input": 3.00,
+      "output": 15.00,
+      "cache_creation": 3.75,
+      "cache_read": 0.30
+    },
+    "claude-haiku-4-5-20251001": {
+      "provider": "claude",
+      "input": 0.80,
+      "output": 4.00,
+      "cache_creation": 1.00,
+      "cache_read": 0.08
+    },
+    "o3": {
+      "provider": "openai",
+      "input": 2.00,
+      "output": 8.00,
+      "cache_creation": 0,
+      "cache_read": 0
+    },
+    "o4-mini": {
+      "provider": "openai",
+      "input": 1.10,
+      "output": 4.40,
+      "cache_creation": 0,
+      "cache_read": 0
+    },
+    "gpt-4o": {
+      "provider": "openai",
+      "input": 2.50,
+      "output": 10.00,
+      "cache_creation": 0,
+      "cache_read": 1.25
+    },
+    "gpt-4o-mini": {
+      "provider": "openai",
+      "input": 0.15,
+      "output": 0.60,
+      "cache_creation": 0,
+      "cache_read": 0.075
+    },
+    "codex": {
+      "provider": "openai",
+      "input": 2.50,
+      "output": 10.00,
+      "cache_creation": 0,
+      "cache_read": 1.25
+    },
+    "codex-mini": {
+      "provider": "openai",
+      "input": 0.15,
+      "output": 0.60,
+      "cache_creation": 0,
+      "cache_read": 0.075
+    },
+    "gpt-5.4": {
+      "provider": "openai",
+      "input": 2.50,
+      "output": 10.00,
+      "cache_creation": 0,
+      "cache_read": 1.25
+    },
+    "gpt-5.3-codex": {
+      "provider": "openai",
+      "input": 2.50,
+      "output": 10.00,
+      "cache_creation": 0,
+      "cache_read": 1.25
+    }
+  }
+}

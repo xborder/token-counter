@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:TokenCounter}",
+            "name": "Debug TokenCounter",
+            "target": "TokenCounter",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug TokenCounter"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:TokenCounter}",
+            "name": "Release TokenCounter",
+            "target": "TokenCounter",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release TokenCounter"
+        }
+    ]
+}
