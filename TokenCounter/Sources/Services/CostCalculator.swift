@@ -73,15 +73,21 @@ struct CostCalculator {
         ),
         "gpt-5.4": ModelPricing(
             inputPricePer1M: 2.50,
-            outputPricePer1M: 10.0,
+            outputPricePer1M: 15.0,
             cacheCreationPricePer1M: 0,
-            cacheReadPricePer1M: 1.25
+            cacheReadPricePer1M: 0.25
         ),
         "gpt-5.3-codex": ModelPricing(
-            inputPricePer1M: 2.50,
-            outputPricePer1M: 10.0,
+            inputPricePer1M: 1.75,
+            outputPricePer1M: 14.0,
             cacheCreationPricePer1M: 0,
-            cacheReadPricePer1M: 1.25
+            cacheReadPricePer1M: 0.175
+        ),
+        "gpt-5.2-codex": ModelPricing(
+            inputPricePer1M: 1.75,
+            outputPricePer1M: 14.0,
+            cacheCreationPricePer1M: 0,
+            cacheReadPricePer1M: 0.175
         ),
     ]
 

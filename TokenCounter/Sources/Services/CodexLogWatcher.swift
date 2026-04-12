@@ -84,10 +84,11 @@ final class CodexLogWatcher {
         fileOffsets[filePath] = result.newOffset
         guard !result.turns.isEmpty, let store = store else { return }
 
-        let project = store.findOrCreateCodexProject()
-
         var didInsert = false
         for parsedTurn in result.turns {
+            // Create/find project based on working directory
+            let project = store.findOrCreateProject(path: parsedTurn.projectPath)
+
             let session = store.findOrCreateCodexSession(
                 sessionId: parsedTurn.sessionId,
                 in: project,
@@ -106,7 +107,6 @@ final class CodexLogWatcher {
             )
             turn.inputTokens = parsedTurn.inputTokens
             turn.outputTokens = parsedTurn.outputTokens
-            turn.cachedPromptTokens = parsedTurn.cachedInputTokens
             turn.cacheReadTokens = parsedTurn.cachedInputTokens
             turn.reasoningTokens = parsedTurn.reasoningTokens
             turn.estimatedCostUSD = costCalculator.cost(for: turn)

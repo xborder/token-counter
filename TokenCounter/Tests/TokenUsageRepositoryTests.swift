@@ -250,4 +250,21 @@ struct TokenUsageRepositoryTests {
         #expect(result.turns[1].model == "gpt-5.4")
         #expect(result.turns[2].model == "gpt-5.3-codex")
     }
+
+    @Test("Codex parser extracts working directory from session_meta")
+    func codexParserExtractsWorkingDirectory() throws {
+        let tmpURL = FileManager.default.temporaryDirectory.appendingPathComponent("tc_codex_cwd_\(UUID().uuidString).jsonl")
+        let content = """
+        {"timestamp":"2026-04-10T09:17:28.000Z","type":"session_meta","payload":{"id":"session-123","cwd":"/Users/helder/repos/token-counter"}}
+        {"timestamp":"2026-04-10T09:17:29.000Z","type":"turn_context","payload":{"turn_id":"turn-001","model":"gpt-5.4"}}
+        {"timestamp":"2026-04-10T09:17:30.000Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"cached_input_tokens":0,"output_tokens":50,"reasoning_output_tokens":0,"total_tokens":150}}}}
+        """
+        try content.write(to: tmpURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tmpURL) }
+
+        let result = try CodexLogParser.parseFile(at: tmpURL)
+        #expect(result.turns.count == 1)
+        #expect(result.turns[0].cwd == "/Users/helder/repos/token-counter")
+        #expect(result.turns[0].projectPath == "-Users-helder-repos-token-counter")
+    }
 }

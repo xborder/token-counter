@@ -20,6 +20,9 @@ struct CodexLogParser {
             let info: TokenInfo?
             // Direct model field present on `type: "turn_context"` events
             let model: String?
+            // Session metadata from `type: "session_meta"` events
+            let id: String?
+            let cwd: String?
         }
 
         struct TokenInfo: Decodable {
@@ -60,6 +63,8 @@ struct CodexLogParser {
         let outputTokens: Int
         let reasoningTokens: Int
         let sessionDate: String
+        let cwd: String  // Working directory from session_meta
+        let projectPath: String  // Encoded project path for storing in TokenStore
     }
 
     // MARK: - Date parsing
@@ -111,10 +116,18 @@ struct CodexLogParser {
         var turns: [ParsedTurn] = []
         var previousTotal: LogEvent.TokenUsage?
         var currentModel = "codex"
+        var currentCwd = ""
+        var projectPath = "codex"  // Default fallback
 
         for lineData in lines {
             guard let event = try? decoder.decode(LogEvent.self, from: Data(lineData)) else {
                 continue
+            }
+
+            // Extract working directory from session_meta event
+            if event.type == "session_meta", let cwd = event.payload?.cwd {
+                currentCwd = cwd
+                projectPath = encodeProjectPath(cwd)
             }
 
             if event.type == "turn_context", let model = event.payload?.model {
@@ -171,7 +184,9 @@ struct CodexLogParser {
                     cachedInputTokens: max(0, turnUsage.cached),
                     outputTokens: max(0, turnUsage.output),
                     reasoningTokens: max(0, turnUsage.reasoning),
-                    sessionDate: sessionDate
+                    sessionDate: sessionDate,
+                    cwd: currentCwd,
+                    projectPath: projectPath
                 ))
             }
 
@@ -187,5 +202,12 @@ struct CodexLogParser {
             return "unknown"
         }
         return "\(components[idx + 1])/\(components[idx + 2])/\(components[idx + 3])"
+    }
+
+    private static func encodeProjectPath(_ cwd: String) -> String {
+        // Encode working directory as project path: /Users/helder/repos/foo -> -Users-helder-repos-foo
+        // Remove leading slash and replace remaining slashes with dashes
+        let trimmed = cwd.hasPrefix("/") ? String(cwd.dropFirst()) : cwd
+        return "-" + trimmed.replacingOccurrences(of: "/", with: "-")
     }
 }
