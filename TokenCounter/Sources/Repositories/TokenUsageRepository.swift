@@ -59,6 +59,13 @@ final class TokenUsageRepository {
         var estimatedCost: Double = 0
         var cacheSavings: Double = 0
         var turnCount: Int = 0
+
+        // Per-type cost breakdown
+        var inputCost: Double = 0
+        var outputCost: Double = 0
+        var cacheCreationCost: Double = 0
+        var cacheReadCost: Double = 0
+        var reasoningCost: Double = 0
     }
 
     struct ModelUsage: Identifiable {
@@ -94,6 +101,14 @@ final class TokenUsageRepository {
             summary.estimatedCost += turn.estimatedCostUSD
             summary.cacheSavings += calculator.cacheSavings(for: turn)
             summary.turnCount += 1
+
+            if let pricing = calculator.pricing(for: turn.model) {
+                summary.inputCost += Double(turn.inputTokens) * pricing.inputPricePer1M / 1_000_000
+                summary.outputCost += Double(turn.outputTokens) * pricing.outputPricePer1M / 1_000_000
+                summary.cacheCreationCost += Double(turn.cacheCreationTokens) * pricing.cacheCreationPricePer1M / 1_000_000
+                summary.cacheReadCost += Double(turn.cacheReadTokens) * pricing.cacheReadPricePer1M / 1_000_000
+                summary.reasoningCost += Double(turn.reasoningTokens) * pricing.outputPricePer1M / 1_000_000
+            }
         }
         return summary
     }
@@ -120,9 +135,15 @@ final class TokenUsageRepository {
         return byModel.values.sorted { $0.estimatedCost > $1.estimatedCost }
     }
 
-    /// Fetch all projects with their sessions.
+    /// Fetch projects that have at least one session active within the time range.
     func projects(for timeRange: TimeRange) -> [Project] {
-        store.projects.values.sorted { $0.displayName < $1.displayName }
+        let startDate = timeRange.startDate
+        return store.projects.values
+            .filter { project in
+                guard let startDate else { return !project.sessions.isEmpty }
+                return project.sessions.contains { $0.lastActivityAt >= startDate }
+            }
+            .sorted { $0.displayName < $1.displayName }
     }
 
     /// Fetch sessions for a project, filtered by time range.
@@ -136,9 +157,12 @@ final class TokenUsageRepository {
             .sorted { $0.lastActivityAt > $1.lastActivityAt }
     }
 
-    /// Fetch turns for a session.
-    func turns(for session: Session) -> [Turn] {
-        session.turns.sorted { $0.timestamp < $1.timestamp }
+    /// Fetch turns for a session, optionally filtered by time range.
+    func turns(for session: Session, timeRange: TimeRange = .allTime) -> [Turn] {
+        let startDate = timeRange.startDate
+        return session.turns
+            .filter { startDate == nil || $0.timestamp >= startDate! }
+            .sorted { $0.timestamp < $1.timestamp }
     }
 
     // MARK: - Private

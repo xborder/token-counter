@@ -67,6 +67,15 @@ struct FooterView: View {
             .popover(isPresented: $viewModel.showSettings) {
                 SettingsView()
             }
+
+            Button {
+                NSApplication.shared.terminate(nil)
+            } label: {
+                Image(systemName: "power")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .help("Quit TokenCounter")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

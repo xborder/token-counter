@@ -15,6 +15,7 @@ struct TokenBreakdownView: View {
                 TokenRow(
                     label: "Input (non-cached)",
                     tokens: summary.inputTokens,
+                    cost: summary.inputCost,
                     color: .blue,
                     total: maxTokens
                 )
@@ -22,6 +23,7 @@ struct TokenBreakdownView: View {
                 TokenRow(
                     label: "Output",
                     tokens: summary.outputTokens,
+                    cost: summary.outputCost,
                     color: .green,
                     total: maxTokens
                 )
@@ -29,6 +31,7 @@ struct TokenBreakdownView: View {
                 TokenRow(
                     label: "Cache Creation",
                     tokens: summary.cacheCreationTokens,
+                    cost: summary.cacheCreationCost,
                     color: .orange,
                     total: maxTokens
                 )
@@ -36,6 +39,7 @@ struct TokenBreakdownView: View {
                 TokenRow(
                     label: "Cache Read",
                     tokens: summary.cacheReadTokens,
+                    cost: summary.cacheReadCost,
                     color: .purple,
                     total: maxTokens
                 )
@@ -44,6 +48,7 @@ struct TokenBreakdownView: View {
                     TokenRow(
                         label: "Reasoning",
                         tokens: summary.reasoningTokens,
+                        cost: summary.reasoningCost,
                         color: .pink,
                         total: maxTokens
                     )
@@ -53,6 +58,7 @@ struct TokenBreakdownView: View {
                     TokenRow(
                         label: "Cached Prompt",
                         tokens: summary.cachedPromptTokens,
+                        cost: 0,
                         color: .cyan,
                         total: maxTokens
                     )
@@ -78,6 +84,7 @@ struct TokenBreakdownView: View {
 struct TokenRow: View {
     let label: String
     let tokens: Int
+    let cost: Double
     let color: Color
     let total: Int
 
@@ -86,7 +93,7 @@ struct TokenRow: View {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .frame(width: 120, alignment: .leading)
+                .frame(width: 100, alignment: .leading)
 
             GeometryReader { geo in
                 let fraction = total > 0 ? CGFloat(tokens) / CGFloat(total) : 0
@@ -99,7 +106,13 @@ struct TokenRow: View {
             Text(FormatHelpers.formatTokensCompact(tokens))
                 .font(.caption)
                 .monospacedDigit()
-                .frame(width: 50, alignment: .trailing)
+                .frame(width: 46, alignment: .trailing)
+
+            Text(cost > 0 ? FormatHelpers.formatCost(cost) : "—")
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(cost > 0 ? .primary : .tertiary)
+                .frame(width: 46, alignment: .trailing)
         }
     }
 }

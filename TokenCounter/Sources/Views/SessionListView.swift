@@ -57,7 +57,7 @@ struct ProjectRow: View {
 
                     Spacer()
 
-                    Text("\(project.sessions.count) sessions")
+                    Text("\(viewModel.sessions(for: project).count) sessions")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -146,14 +146,35 @@ struct SessionRow: View {
 struct TurnListView: View {
     let turns: [Turn]
 
+    private struct ModelRow: Identifiable {
+        let id: String
+        let model: String
+        let inputTokens: Int
+        let outputTokens: Int
+        let cacheTokens: Int
+        let cost: Double
+    }
+
+    private var modelRows: [ModelRow] {
+        var grouped: [String: (input: Int, output: Int, cache: Int, cost: Double)] = [:]
+        for turn in turns {
+            let key = turn.model
+            grouped[key, default: (0, 0, 0, 0.0)].input += turn.totalInputTokens
+            grouped[key, default: (0, 0, 0, 0.0)].output += turn.outputTokens
+            grouped[key, default: (0, 0, 0, 0.0)].cache += turn.cacheReadTokens
+            grouped[key, default: (0, 0, 0, 0.0)].cost += turn.estimatedCostUSD
+        }
+        return grouped.map { key, val in
+            ModelRow(id: key, model: key, inputTokens: val.input,
+                     outputTokens: val.output, cacheTokens: val.cache, cost: val.cost)
+        }.sorted { $0.cost > $1.cost }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            // Column headers
             HStack(spacing: 4) {
-                Text("Time")
-                    .frame(width: 50, alignment: .leading)
                 Text("Model")
-                    .frame(width: 70, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Text("In")
                     .frame(width: 40, alignment: .trailing)
                 Text("Out")
@@ -166,58 +187,29 @@ struct TurnListView: View {
             .font(.system(size: 8, weight: .medium))
             .foregroundStyle(.tertiary)
 
-            ForEach(turns) { turn in
-                TurnRow(turn: turn)
+            ForEach(modelRows) { row in
+                HStack(spacing: 4) {
+                    Text(shortName(row.model))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(1)
+                    Text(FormatHelpers.formatTokensCompact(row.inputTokens))
+                        .frame(width: 40, alignment: .trailing)
+                    Text(FormatHelpers.formatTokensCompact(row.outputTokens))
+                        .frame(width: 40, alignment: .trailing)
+                    Text(FormatHelpers.formatTokensCompact(row.cacheTokens))
+                        .frame(width: 40, alignment: .trailing)
+                    Text(FormatHelpers.formatCost(row.cost))
+                        .frame(width: 45, alignment: .trailing)
+                }
+                .font(.system(size: 9))
+                .monospacedDigit()
             }
         }
         .padding(.vertical, 4)
     }
-}
 
-struct TurnRow: View {
-    let turn: Turn
-
-    var body: some View {
-        HStack(spacing: 4) {
-            // Indent subagent turns
-            if turn.isSubagent {
-                Image(systemName: "arrow.turn.down.right")
-                    .font(.system(size: 7))
-                    .foregroundStyle(.tertiary)
-            }
-
-            Text(timeString)
-                .frame(width: turn.isSubagent ? 42 : 50, alignment: .leading)
-
-            Text(shortModelName)
-                .frame(width: 70, alignment: .leading)
-                .lineLimit(1)
-
-            Text(FormatHelpers.formatTokensCompact(turn.totalInputTokens))
-                .frame(width: 40, alignment: .trailing)
-
-            Text(FormatHelpers.formatTokensCompact(turn.outputTokens))
-                .frame(width: 40, alignment: .trailing)
-
-            Text(FormatHelpers.formatTokensCompact(turn.cacheReadTokens))
-                .frame(width: 40, alignment: .trailing)
-
-            Text(FormatHelpers.formatCost(turn.estimatedCostUSD))
-                .frame(width: 45, alignment: .trailing)
-        }
-        .font(.system(size: 9))
-        .monospacedDigit()
-        .foregroundStyle(turn.isSubagent ? .secondary : .primary)
-    }
-
-    private var timeString: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: turn.timestamp)
-    }
-
-    private var shortModelName: String {
-        turn.model
+    private func shortName(_ model: String) -> String {
+        model
             .replacingOccurrences(of: "claude-", with: "")
             .replacingOccurrences(of: "-20251001", with: "")
     }

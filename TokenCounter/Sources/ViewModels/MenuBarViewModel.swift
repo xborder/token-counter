@@ -84,7 +84,7 @@ final class MenuBarViewModel {
 
     func turns(for session: Session) -> [Turn] {
         guard let repository else { return [] }
-        return repository.turns(for: session)
+        return repository.turns(for: session, timeRange: selectedTimeRange)
     }
 
     // MARK: - Auto-refresh
