@@ -83,6 +83,12 @@ struct CostCalculator {
             cacheCreationPricePer1M: 0,
             cacheReadPricePer1M: 1.25
         ),
+        "gpt-5.2-codex": ModelPricing(
+            inputPricePer1M: 2.50,
+            outputPricePer1M: 10.0,
+            cacheCreationPricePer1M: 0,
+            cacheReadPricePer1M: 1.25
+        ),
     ]
 
     /// User overrides loaded from settings (model -> pricing).
