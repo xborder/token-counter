@@ -107,7 +107,6 @@ final class CodexLogWatcher {
             )
             turn.inputTokens = parsedTurn.inputTokens
             turn.outputTokens = parsedTurn.outputTokens
-            turn.cachedPromptTokens = parsedTurn.cachedInputTokens
             turn.cacheReadTokens = parsedTurn.cachedInputTokens
             turn.reasoningTokens = parsedTurn.reasoningTokens
             turn.estimatedCostUSD = costCalculator.cost(for: turn)
