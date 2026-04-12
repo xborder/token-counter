@@ -18,12 +18,8 @@ struct CodexLogParser {
         struct Payload: Decodable {
             let type: String?
             let info: TokenInfo?
-            let turnContext: TurnContext?
-
-            enum CodingKeys: String, CodingKey {
-                case type, info
-                case turnContext = "turn_context"
-            }
+            // Direct model field present on `type: "turn_context"` events
+            let model: String?
         }
 
         struct TokenInfo: Decodable {
@@ -52,9 +48,6 @@ struct CodexLogParser {
             }
         }
 
-        struct TurnContext: Decodable {
-            let model: String?
-        }
     }
 
     /// A parsed turn extracted from one token_count event.
@@ -124,7 +117,7 @@ struct CodexLogParser {
                 continue
             }
 
-            if let model = event.payload?.turnContext?.model {
+            if event.type == "turn_context", let model = event.payload?.model {
                 currentModel = model
             }
 
