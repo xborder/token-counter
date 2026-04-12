@@ -84,10 +84,11 @@ final class CodexLogWatcher {
         fileOffsets[filePath] = result.newOffset
         guard !result.turns.isEmpty, let store = store else { return }
 
-        let project = store.findOrCreateCodexProject()
-
         var didInsert = false
         for parsedTurn in result.turns {
+            // Create/find project based on working directory
+            let project = store.findOrCreateProject(path: parsedTurn.projectPath)
+
             let session = store.findOrCreateCodexSession(
                 sessionId: parsedTurn.sessionId,
                 in: project,
