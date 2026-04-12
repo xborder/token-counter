@@ -37,10 +37,10 @@ final class AppController {
     }
 }
 
-/// A distinctive, legible menu bar icon.
+/// Menu bar label — shows "TC" text so it renders on any background and takes minimal space.
 struct MenuBarIcon: View {
     var body: some View {
-        Image(systemName: "t.circle.fill")
-            .font(.system(size: 14, weight: .medium))
+        Text("TC")
+            .font(.system(size: 12, weight: .semibold, design: .monospaced))
     }
 }
