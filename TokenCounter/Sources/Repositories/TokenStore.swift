@@ -88,6 +88,17 @@ final class TokenStore {
         guard turnIndex[turn.uuid] == nil else { return }
         session.turns.append(turn)
         turnIndex[turn.uuid] = turn
+        // Update activity timestamps based on turn
+        if session.turns.count == 1 {
+            // First turn: set both start and last activity
+            session.startedAt = turn.timestamp
+            session.lastActivityAt = turn.timestamp
+        } else {
+            // Subsequent turns: update last activity if more recent
+            if turn.timestamp > session.lastActivityAt {
+                session.lastActivityAt = turn.timestamp
+            }
+        }
     }
 
     // MARK: - Persistence
