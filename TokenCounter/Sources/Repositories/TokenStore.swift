@@ -86,30 +86,6 @@ final class TokenStore {
         return s
     }
 
-    func findOrCreatePiSession(sessionId: String, in project: Project, timestamp: Date) -> Session {
-        if let s = project.sessions.first(where: { $0.sessionId == sessionId }) { return s }
-        let s = Session(
-            sessionId: sessionId,
-            startedAt: timestamp,
-            lastActivityAt: timestamp,
-            slug: sessionId.replacingOccurrences(of: "pi-", with: "pi/")
-        )
-        project.sessions.append(s)
-        return s
-    }
-
-    func findOrCreateOpenCodeSession(sessionId: String, in project: Project, title: String?, timestamp: Date) -> Session {
-        if let s = project.sessions.first(where: { $0.sessionId == sessionId }) { return s }
-        let s = Session(
-            sessionId: sessionId,
-            startedAt: timestamp,
-            lastActivityAt: timestamp,
-            slug: title ?? sessionId
-        )
-        project.sessions.append(s)
-        return s
-    }
-
     func insertTurn(_ turn: Turn, into session: Session) {
         guard turnIndex[turn.uuid] == nil else { return }
         session.turns.append(turn)

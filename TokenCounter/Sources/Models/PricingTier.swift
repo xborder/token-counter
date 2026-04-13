@@ -47,6 +47,7 @@ struct PricingConfig: Codable {
         let input: Double
         let output: Double
         let cacheCreation: Double
+        let cacheCreation1h: Double?
         let cacheRead: Double
 
         enum CodingKeys: String, CodingKey {
@@ -54,6 +55,7 @@ struct PricingConfig: Codable {
             case input
             case output
             case cacheCreation = "cache_creation"
+            case cacheCreation1h = "cache_creation_1h"
             case cacheRead = "cache_read"
         }
     }

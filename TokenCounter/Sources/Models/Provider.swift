@@ -1,11 +1,9 @@
 import Foundation
 
-/// Token provider (Claude/Anthropic, OpenAI/Codex, Pi CLI, or OpenCode).
+/// Token provider (Claude/Anthropic or OpenAI/Codex).
 enum Provider: String, Codable, CaseIterable, Identifiable {
     case claude
     case openai
-    case pi
-    case opencode
 
     var id: String { rawValue }
 
@@ -13,8 +11,6 @@ enum Provider: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .claude: "Claude"
         case .openai: "OpenAI"
-        case .pi: "Pi CLI"
-        case .opencode: "OpenCode"
         }
     }
 }

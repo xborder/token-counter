@@ -184,6 +184,41 @@ struct CodexLogParserTests {
         #expect(result2.turns[0].model == "codex")
     }
 
+    @Test func carriesPreviousTotalAcrossIncrementalReads() throws {
+        let tmpURL = FileManager.default.temporaryDirectory.appendingPathComponent("tc_codex_prev_total_\(UUID().uuidString).jsonl")
+        defer { try? FileManager.default.removeItem(at: tmpURL) }
+
+        let chunk1 = """
+        {"timestamp":"2026-04-11T10:00:00.000Z","type":"turn_context","payload":{"turn_id":"t1","model":"gpt-5.4"}}
+        {"timestamp":"2026-04-11T10:00:01.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":500,"cached_input_tokens":100,"output_tokens":200,"reasoning_output_tokens":50,"total_tokens":700},"last_token_usage":{"input_tokens":500,"cached_input_tokens":100,"output_tokens":200,"reasoning_output_tokens":50,"total_tokens":700}}}}
+
+        """
+        try chunk1.write(to: tmpURL, atomically: true, encoding: .utf8)
+
+        let result1 = try CodexLogParser.parseFile(at: tmpURL)
+        #expect(result1.turns.count == 1)
+
+        let chunk2 = """
+        {"timestamp":"2026-04-11T10:00:02.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":900,"cached_input_tokens":250,"output_tokens":320,"reasoning_output_tokens":80,"total_tokens":1220}}}}
+
+        """
+        let fileHandle = try FileHandle(forWritingTo: tmpURL)
+        fileHandle.seekToEndOfFile()
+        fileHandle.write(Data(chunk2.utf8))
+        try fileHandle.close()
+
+        let withState = try CodexLogParser.parseFile(at: tmpURL, fromOffset: result1.newOffset, state: result1.fileState)
+        #expect(withState.turns.count == 1)
+        #expect(withState.turns[0].inputTokens == 250)
+        #expect(withState.turns[0].cachedInputTokens == 150)
+        #expect(withState.turns[0].outputTokens == 120)
+        #expect(withState.turns[0].reasoningTokens == 30)
+
+        let withoutState = try CodexLogParser.parseFile(at: tmpURL, fromOffset: result1.newOffset)
+        #expect(withoutState.turns.count == 1)
+        #expect(withoutState.turns[0].inputTokens != withState.turns[0].inputTokens)
+    }
+
     // MARK: - Date parsing
 
     @Test func parsesISO8601WithFractionalSeconds() {

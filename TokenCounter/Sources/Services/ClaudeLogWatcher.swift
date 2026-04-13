@@ -129,7 +129,28 @@ final class ClaudeLogWatcher {
 
         var didInsert = false
         for parsedTurn in result.turns {
-            guard !store.hasTurn(uuid: parsedTurn.requestId) else { continue }
+            if let existingTurn = store.turn(uuid: parsedTurn.requestId) {
+                existingTurn.model = parsedTurn.model
+                existingTurn.inputTokens = parsedTurn.inputTokens
+                existingTurn.outputTokens = parsedTurn.outputTokens
+                existingTurn.cacheCreationTokens = parsedTurn.cacheCreationTokens
+                existingTurn.cacheReadTokens = parsedTurn.cacheReadTokens
+                existingTurn.cacheCreation5mTokens = parsedTurn.cacheCreation5mTokens
+                existingTurn.cacheCreation1hTokens = parsedTurn.cacheCreation1hTokens
+                existingTurn.isSubagent = isSubagent
+                existingTurn.estimatedCostUSD = calculator.cost(for: existingTurn)
+
+                if let agentId = parsedTurn.agentId, let meta = subagentMetaCache[agentId] {
+                    existingTurn.subagentType = meta.agentType
+                }
+
+                if parsedTurn.timestamp > session.lastActivityAt { session.lastActivityAt = parsedTurn.timestamp }
+                if session.gitBranch == nil { session.gitBranch = parsedTurn.gitBranch }
+                if session.slug == nil { session.slug = parsedTurn.slug }
+                if session.cwd == nil { session.cwd = parsedTurn.cwd }
+                didInsert = true
+                continue
+            }
 
             let turn = Turn(
                 uuid: parsedTurn.requestId,

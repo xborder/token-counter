@@ -92,6 +92,7 @@ struct CodexLogParser {
         var model: String = "codex"
         var cwd: String = ""
         var projectPath: String = "codex"
+        var previousTotal: LogEvent.TokenUsage? = nil
     }
 
     /// Parse a Codex rollout JSONL file and return per-turn token usage.
@@ -124,7 +125,7 @@ struct CodexLogParser {
         let sessionDate = extractSessionDate(from: url.pathComponents)
 
         var turns: [ParsedTurn] = []
-        var previousTotal: LogEvent.TokenUsage?
+        var previousTotal = state.previousTotal
         var currentModel = state.model
         var currentCwd = state.cwd
         var projectPath = state.projectPath
@@ -203,7 +204,12 @@ struct CodexLogParser {
             previousTotal = info.totalTokenUsage
         }
 
-        let finalState = FileState(model: currentModel, cwd: currentCwd, projectPath: projectPath)
+        let finalState = FileState(
+            model: currentModel,
+            cwd: currentCwd,
+            projectPath: projectPath,
+            previousTotal: previousTotal
+        )
         return (turns, fileSize, finalState)
     }
 

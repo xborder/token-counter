@@ -257,46 +257,6 @@ struct CostIntegrationTests {
                 "Unknown model per-type costs (\(typeCostSum)) must sum to total (\(summary.estimatedCost))")
     }
 
-    // MARK: - Pi CLI token semantics
-
-    @Test func piParserSubtractsCacheFromInput() throws {
-        let tmpURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("tc_pi_cache_\(UUID().uuidString).jsonl")
-        defer { try? FileManager.default.removeItem(at: tmpURL) }
-
-        // Pi JSONL with cached input tokens
-        let content = """
-        {"type":"message","id":"msg1","timestamp":"2026-04-10T10:00:00.000Z","message":{"role":"assistant","model":"gpt-5.4","provider":"openai","usage":{"input":5000,"output":200,"cacheRead":3000,"cacheWrite":0,"totalTokens":5200,"cost":{"total":0.015}}}}
-        """
-        try content.write(to: tmpURL, atomically: true, encoding: .utf8)
-
-        let result = try PiLogParser.parseFile(at: tmpURL)
-        #expect(result.turns.count == 1)
-
-        let turn = result.turns[0]
-        // input=5000 includes 3000 cached; non-cached = 5000 - 3000 = 2000
-        #expect(turn.inputTokens == 2000, "Non-cached input should be input - cacheRead")
-        #expect(turn.cacheReadTokens == 3000)
-        // totalInputTokens = inputTokens + cacheReadTokens = 2000 + 3000 = 5000
-        #expect(turn.inputTokens + turn.cacheReadTokens == 5000)
-    }
-
-    @Test func piParserHandlesZeroCacheRead() throws {
-        let tmpURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("tc_pi_no_cache_\(UUID().uuidString).jsonl")
-        defer { try? FileManager.default.removeItem(at: tmpURL) }
-
-        let content = """
-        {"type":"message","id":"msg1","timestamp":"2026-04-10T10:00:00.000Z","message":{"role":"assistant","model":"gpt-5.4","provider":"openai","usage":{"input":4235,"output":240,"cacheRead":0,"cacheWrite":0,"totalTokens":4475,"cost":{"total":0.01419}}}}
-        """
-        try content.write(to: tmpURL, atomically: true, encoding: .utf8)
-
-        let result = try PiLogParser.parseFile(at: tmpURL)
-        let turn = result.turns[0]
-        #expect(turn.inputTokens == 4235, "No cache → inputTokens = raw input")
-        #expect(turn.cacheReadTokens == 0)
-    }
-
     // MARK: - Input token consistency across providers
 
     @Test func inputTokenSemanticsConsistentAcrossProviders() {
@@ -341,8 +301,6 @@ struct CostIntegrationTests {
         let providers: [(Provider, String)] = [
             (.claude, "claude-opus-4-6"),
             (.openai, "gpt-5.4"),
-            (.pi, "gpt-5.4"),
-            (.opencode, "gpt-5.4"),
         ]
 
         for (i, (provider, model)) in providers.enumerated() {
@@ -356,7 +314,7 @@ struct CostIntegrationTests {
         let repo = TokenUsageRepository(store: store)
 
         let allSummary = repo.summary(for: .allTime, provider: .all)
-        #expect(allSummary.turnCount == 4)
+        #expect(allSummary.turnCount == 2)
 
         let claudeSummary = repo.summary(for: .allTime, provider: .claude)
         #expect(claudeSummary.turnCount == 1)
@@ -364,15 +322,8 @@ struct CostIntegrationTests {
         let openaiSummary = repo.summary(for: .allTime, provider: .openai)
         #expect(openaiSummary.turnCount == 1)
 
-        let piSummary = repo.summary(for: .allTime, provider: .pi)
-        #expect(piSummary.turnCount == 1)
-
-        let opencodeSummary = repo.summary(for: .allTime, provider: .opencode)
-        #expect(opencodeSummary.turnCount == 1)
-
         // Sum of filtered should equal all
         let sumTurns = claudeSummary.turnCount + openaiSummary.turnCount
-            + piSummary.turnCount + opencodeSummary.turnCount
         #expect(sumTurns == allSummary.turnCount)
     }
 
@@ -558,7 +509,7 @@ struct CostIntegrationTests {
         let turn = Turn(uuid: "t1", timestamp: Date(), model: "claude-opus-4-6", provider: "claude")
         turn.inputTokens = 10_000
         turn.outputTokens = 5_000
-        turn.cacheReadTokens = 100_000  // Would have been $1.50 full price, but $0.15 at cache rate
+        turn.cacheReadTokens = 100_000  // Would have been $0.50 full price, but $0.05 at cache rate
         turn.estimatedCostUSD = calculator.cost(for: turn)
         store.insertTurn(turn, into: session)
 

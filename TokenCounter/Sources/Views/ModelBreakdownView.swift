@@ -130,7 +130,7 @@ struct ProviderModelBreakdownView: View {
             ForEach(Array(groupedByProvider.keys.sorted()), id: \.self) { provider in
                 if let providerModels = groupedByProvider[provider] {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(Provider(rawValue: provider)?.displayName ?? provider)
+                        Text(provider == "claude" ? "Claude" : "OpenAI")
                             .font(.caption2)
                             .fontWeight(.semibold)
                             .foregroundStyle(.secondary)
@@ -160,32 +160,12 @@ struct ProviderModelBreakdownView: View {
 struct ProviderBadge: View {
     let provider: String
 
-    private var letter: String {
-        switch provider {
-        case "claude": "C"
-        case "openai": "O"
-        case "pi": "P"
-        case "opencode": "X"
-        default: String(provider.prefix(1).uppercased())
-        }
-    }
-
-    private var color: Color {
-        switch provider {
-        case "claude": .orange
-        case "openai": .teal
-        case "pi": .indigo
-        case "opencode": .mint
-        default: .gray
-        }
-    }
-
     var body: some View {
-        Text(letter)
+        Text(provider == "claude" ? "C" : "O")
             .font(.system(size: 8, weight: .bold))
             .foregroundStyle(.white)
             .frame(width: 14, height: 14)
-            .background(color)
+            .background(provider == "claude" ? Color.orange : Color.teal)
             .clipShape(Circle())
     }
 }

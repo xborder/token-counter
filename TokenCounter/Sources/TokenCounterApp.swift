@@ -24,8 +24,6 @@ final class AppController {
     let viewModel = MenuBarViewModel()
     let claudeWatcher = ClaudeLogWatcher()
     let codexWatcher = CodexLogWatcher()
-    let piWatcher = PiLogWatcher()
-    let opencodeWatcher = OpenCodeLogWatcher()
 
     init() {
         viewModel.configure(store: store)
@@ -34,12 +32,8 @@ final class AppController {
         }
         claudeWatcher.onUpdate = refreshCallback
         codexWatcher.onUpdate = refreshCallback
-        piWatcher.onUpdate = refreshCallback
-        opencodeWatcher.onUpdate = refreshCallback
         claudeWatcher.start(store: store)
         codexWatcher.start(store: store)
-        piWatcher.start(store: store)
-        opencodeWatcher.start(store: store)
     }
 }
 

@@ -42,8 +42,6 @@ final class TokenUsageRepository {
         case all = "All"
         case claude = "Claude"
         case openai = "OpenAI"
-        case pi = "Pi CLI"
-        case opencode = "OpenCode"
 
         var id: String { rawValue }
     }
@@ -103,18 +101,13 @@ final class TokenUsageRepository {
             summary.cacheSavings += calculator.cacheSavings(for: turn)
             summary.turnCount += 1
 
-            if let pricing = calculator.pricing(for: turn.model) {
-                let inputCost = Double(turn.inputTokens) * pricing.inputPricePer1M / 1_000_000
-                let outputCost = Double(turn.outputTokens) * pricing.outputPricePer1M / 1_000_000
-                let cacheCreationCost = Double(turn.cacheCreationTokens) * pricing.cacheCreationPricePer1M / 1_000_000
-                let cacheReadCost = Double(turn.cacheReadTokens) * pricing.cacheReadPricePer1M / 1_000_000
-                let reasoningCost = Double(turn.reasoningTokens) * pricing.outputPricePer1M / 1_000_000
-                summary.inputCost += inputCost
-                summary.outputCost += outputCost
-                summary.cacheCreationCost += cacheCreationCost
-                summary.cacheReadCost += cacheReadCost
-                summary.reasoningCost += reasoningCost
-                summary.estimatedCost += inputCost + outputCost + cacheCreationCost + cacheReadCost
+            if let breakdown = calculator.costBreakdown(for: turn) {
+                summary.inputCost += breakdown.input
+                summary.outputCost += breakdown.output
+                summary.cacheCreationCost += breakdown.cacheCreation
+                summary.cacheReadCost += breakdown.cacheRead
+                summary.reasoningCost += breakdown.reasoning
+                summary.estimatedCost += breakdown.total
             } else {
                 // Unknown model: distribute cached cost proportionally across types
                 // so breakdown rows still sum to total
@@ -148,11 +141,8 @@ final class TokenUsageRepository {
             usage.reasoningTokens += turn.reasoningTokens
             usage.cachedPromptTokens += turn.cachedPromptTokens
             usage.totalTokens += turn.totalTokens
-            if let pricing = calculator.pricing(for: turn.model) {
-                usage.estimatedCost += Double(turn.inputTokens) * pricing.inputPricePer1M / 1_000_000
-                    + Double(turn.outputTokens) * pricing.outputPricePer1M / 1_000_000
-                    + Double(turn.cacheCreationTokens) * pricing.cacheCreationPricePer1M / 1_000_000
-                    + Double(turn.cacheReadTokens) * pricing.cacheReadPricePer1M / 1_000_000
+            if let breakdown = calculator.costBreakdown(for: turn) {
+                usage.estimatedCost += breakdown.total
             } else {
                 usage.estimatedCost += turn.estimatedCostUSD
             }
@@ -207,10 +197,6 @@ final class TokenUsageRepository {
             return turns.filter { $0.provider == Provider.claude.rawValue }
         case .openai:
             return turns.filter { $0.provider == Provider.openai.rawValue }
-        case .pi:
-            return turns.filter { $0.provider == Provider.pi.rawValue }
-        case .opencode:
-            return turns.filter { $0.provider == Provider.opencode.rawValue }
         }
     }
 }
