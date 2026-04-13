@@ -107,16 +107,21 @@ struct PiLogParser {
                 continue
             }
 
-            let totalTokens = (usage.input ?? 0) + (usage.output ?? 0)
+            let rawInput = usage.input ?? 0
+            let cacheRead = usage.cacheRead ?? 0
+            // Pi's `input` field includes cached tokens; subtract cacheRead
+            // to get non-cached input (same as Codex does)
+            let nonCachedInput = max(0, rawInput - cacheRead)
+            let totalTokens = rawInput + (usage.output ?? 0)
             if totalTokens > 0 {
                 turns.append(ParsedTurn(
                     id: id,
                     timestamp: timestamp,
                     model: model,
                     provider: provider,
-                    inputTokens: usage.input ?? 0,
+                    inputTokens: nonCachedInput,
                     outputTokens: usage.output ?? 0,
-                    cacheReadTokens: usage.cacheRead ?? 0,
+                    cacheReadTokens: cacheRead,
                     cacheCreationTokens: usage.cacheWrite ?? 0,
                     estimatedCost: usage.cost?.total ?? 0.0,
                     projectPath: projectPath

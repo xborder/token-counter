@@ -108,14 +108,26 @@ final class TokenUsageRepository {
                 let outputCost = Double(turn.outputTokens) * pricing.outputPricePer1M / 1_000_000
                 let cacheCreationCost = Double(turn.cacheCreationTokens) * pricing.cacheCreationPricePer1M / 1_000_000
                 let cacheReadCost = Double(turn.cacheReadTokens) * pricing.cacheReadPricePer1M / 1_000_000
+                let reasoningCost = Double(turn.reasoningTokens) * pricing.outputPricePer1M / 1_000_000
                 summary.inputCost += inputCost
                 summary.outputCost += outputCost
                 summary.cacheCreationCost += cacheCreationCost
                 summary.cacheReadCost += cacheReadCost
-                summary.reasoningCost += Double(turn.reasoningTokens) * pricing.outputPricePer1M / 1_000_000
+                summary.reasoningCost += reasoningCost
                 summary.estimatedCost += inputCost + outputCost + cacheCreationCost + cacheReadCost
             } else {
-                summary.estimatedCost += turn.estimatedCostUSD
+                // Unknown model: distribute cached cost proportionally across types
+                // so breakdown rows still sum to total
+                let cached = turn.estimatedCostUSD
+                let total = turn.totalTokens
+                if total > 0 {
+                    let perToken = cached / Double(total)
+                    summary.inputCost += perToken * Double(turn.inputTokens)
+                    summary.outputCost += perToken * Double(turn.outputTokens)
+                    summary.cacheCreationCost += perToken * Double(turn.cacheCreationTokens)
+                    summary.cacheReadCost += perToken * Double(turn.cacheReadTokens)
+                }
+                summary.estimatedCost += cached
             }
         }
         return summary

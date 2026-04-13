@@ -90,13 +90,18 @@ struct OpenCodeLogParser {
             let timestamp = Date(timeIntervalSince1970: TimeInterval(row.time_created) / 1000.0)
             let projectPath = encodeProjectPath(row.directory)
 
+            // OpenCode's `input` may include cached tokens; subtract cache.read
+            // to get non-cached input (consistent with Codex/Pi)
+            let cacheRead = row.cache_read_tokens ?? 0
+            let nonCachedInput = max(0, inputTokens - cacheRead)
+
             let turn = ParsedTurn(
                 id: row.id,
                 sessionId: row.session_id,
                 timestamp: timestamp,
                 model: model,
                 provider: provider,
-                inputTokens: inputTokens,
+                inputTokens: nonCachedInput,
                 outputTokens: outputTokens,
                 reasoningTokens: row.reasoning_tokens ?? 0,
                 cacheReadTokens: row.cache_read_tokens ?? 0,
