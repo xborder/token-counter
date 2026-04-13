@@ -13,6 +13,7 @@ final class ClaudeLogWatcher {
 
     private(set) var isWatching = false
     private var basePath: String
+    private let scanInterval: TimeInterval
     private var fileOffsets: [String: UInt64] = [:]  // file path -> last parsed offset
     private var scanTimer: DispatchSourceTimer?
     private var directoryMonitor: DispatchSourceFileSystemObject?
@@ -24,8 +25,9 @@ final class ClaudeLogWatcher {
     /// Subagent metadata cache: agentId -> SubagentMeta
     private var subagentMetaCache: [String: ClaudeLogParser.SubagentMeta] = [:]
 
-    init(basePath: String = ClaudeLogWatcher.defaultBasePath) {
+    init(basePath: String = ClaudeLogWatcher.defaultBasePath, scanInterval: TimeInterval = AppSettings.defaultRefreshInterval) {
         self.basePath = basePath
+        self.scanInterval = scanInterval
     }
 
     // MARK: - Public API
@@ -192,7 +194,7 @@ final class ClaudeLogWatcher {
 
     private func startPeriodicScan() {
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
-        timer.schedule(deadline: .now() + 5, repeating: 5.0)
+        timer.schedule(deadline: .now() + scanInterval, repeating: scanInterval)
         timer.setEventHandler { [weak self] in
             guard let self, self.isWatching else { return }
             self.performFullScan()

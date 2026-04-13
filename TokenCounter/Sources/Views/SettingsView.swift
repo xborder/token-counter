@@ -2,17 +2,34 @@ import SwiftUI
 
 /// Settings sheet accessible from the popover footer.
 struct SettingsView: View {
-    @AppStorage("logBasePath") private var logBasePath = ClaudeLogWatcher.defaultBasePath
-    @AppStorage("codexLogBasePath") private var codexLogBasePath = CodexLogWatcher.defaultBasePath
-    @AppStorage("refreshInterval") private var refreshInterval: Double = 5.0
-    @AppStorage("launchAtLogin") private var launchAtLogin = false
+    let controller: AppController
+
+    @State private var logBasePath: String
+    @State private var codexLogBasePath: String
+    @State private var refreshInterval: Double
+    @State private var launchAtLogin: Bool
+    @State private var errorMessage: String?
 
     @Environment(\.dismiss) private var dismiss
+
+    init(controller: AppController) {
+        self.controller = controller
+        _logBasePath = State(initialValue: AppSettings.claudeLogBasePath())
+        _codexLogBasePath = State(initialValue: AppSettings.codexLogBasePath())
+        _refreshInterval = State(initialValue: AppSettings.refreshInterval())
+        _launchAtLogin = State(initialValue: LaunchAtLoginManager.isEnabled())
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Settings")
                 .font(.headline)
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
 
             // Log directory
             GroupBox("Claude Code Logs") {
@@ -75,12 +92,37 @@ struct SettingsView: View {
             HStack {
                 Spacer()
                 Button("Done") {
-                    dismiss()
+                    saveSettings()
                 }
                 .keyboardShortcut(.defaultAction)
             }
         }
         .padding()
         .frame(width: 280, height: 420)
+    }
+
+    private func saveSettings() {
+        let normalizedClaudeLogBasePath = (logBasePath.trimmingCharacters(in: .whitespacesAndNewlines) as NSString).expandingTildeInPath
+        let normalizedCodexLogBasePath = (codexLogBasePath.trimmingCharacters(in: .whitespacesAndNewlines) as NSString).expandingTildeInPath
+        let effectiveClaudeLogBasePath = normalizedClaudeLogBasePath.isEmpty ? ClaudeLogWatcher.defaultBasePath : normalizedClaudeLogBasePath
+        let effectiveCodexLogBasePath = normalizedCodexLogBasePath.isEmpty ? CodexLogWatcher.defaultBasePath : normalizedCodexLogBasePath
+        let effectiveRefreshInterval = AppSettings.clampRefreshInterval(refreshInterval)
+
+        do {
+            try controller.applySettings(
+                claudeLogBasePath: effectiveClaudeLogBasePath,
+                codexLogBasePath: effectiveCodexLogBasePath,
+                refreshInterval: effectiveRefreshInterval,
+                launchAtLogin: launchAtLogin
+            )
+            AppSettings.save(
+                claudeLogBasePath: effectiveClaudeLogBasePath,
+                codexLogBasePath: effectiveCodexLogBasePath,
+                refreshInterval: effectiveRefreshInterval
+            )
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }

@@ -81,11 +81,13 @@ final class MenuBarViewModel {
     private var repository: TokenUsageRepository?
     private var costCalculator = CostCalculator()
     private var refreshTimer: Timer?
+    private var refreshInterval: TimeInterval = AppSettings.defaultRefreshInterval
 
     // MARK: - Setup
 
-    func configure(store: TokenStore) {
+    func configure(store: TokenStore, refreshInterval: TimeInterval = AppSettings.defaultRefreshInterval) {
         self.repository = TokenUsageRepository(store: store)
+        self.refreshInterval = AppSettings.clampRefreshInterval(refreshInterval)
         refresh()
         startAutoRefresh()
     }
@@ -109,6 +111,11 @@ final class MenuBarViewModel {
     func selectProvider(_ provider: TokenUsageRepository.ProviderFilter) {
         selectedProvider = provider
         refresh()
+    }
+
+    func setRefreshInterval(_ interval: TimeInterval) {
+        refreshInterval = AppSettings.clampRefreshInterval(interval)
+        startAutoRefresh()
     }
 
     func toggleModel(_ model: String) {
@@ -148,7 +155,8 @@ final class MenuBarViewModel {
     // MARK: - Auto-refresh
 
     private func startAutoRefresh() {
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        refreshTimer?.invalidate()
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
             self?.refresh()
         }
     }

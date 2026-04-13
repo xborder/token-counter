@@ -14,6 +14,7 @@ final class CodexLogWatcher {
 
     private(set) var isWatching = false
     private var basePath: String
+    private let scanInterval: TimeInterval
     private var fileOffsets: [String: UInt64] = [:]
     private var fileStates: [String: CodexLogParser.FileState] = [:]
     private var scanTimer: DispatchSourceTimer?
@@ -23,8 +24,9 @@ final class CodexLogWatcher {
     /// Callback invoked on the main queue whenever new turns are ingested.
     var onUpdate: (() -> Void)?
 
-    init(basePath: String = CodexLogWatcher.defaultBasePath) {
+    init(basePath: String = CodexLogWatcher.defaultBasePath, scanInterval: TimeInterval = AppSettings.defaultRefreshInterval) {
         self.basePath = basePath
+        self.scanInterval = scanInterval
     }
 
     // MARK: - Public API
@@ -141,7 +143,7 @@ final class CodexLogWatcher {
 
     private func startPeriodicScan() {
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
-        timer.schedule(deadline: .now() + 5, repeating: 5.0)
+        timer.schedule(deadline: .now() + scanInterval, repeating: scanInterval)
         timer.setEventHandler { [weak self] in
             guard let self, self.isWatching else { return }
             self.performFullScan()

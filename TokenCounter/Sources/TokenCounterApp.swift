@@ -9,7 +9,7 @@ struct TokenCounterApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarPopover(viewModel: controller.viewModel)
+            MenuBarPopover(viewModel: controller.viewModel, controller: controller)
         } label: {
             MenuBarIcon()
         }
@@ -22,18 +22,74 @@ struct TokenCounterApp: App {
 final class AppController {
     let store = TokenStore()
     let viewModel = MenuBarViewModel()
-    let claudeWatcher = ClaudeLogWatcher()
-    let codexWatcher = CodexLogWatcher()
+    private var claudeWatcher: ClaudeLogWatcher
+    private var codexWatcher: CodexLogWatcher
+
+    private var claudeLogBasePath: String
+    private var codexLogBasePath: String
+    private var refreshInterval: TimeInterval
 
     init() {
-        viewModel.configure(store: store)
+        let initialClaudeLogBasePath = AppSettings.claudeLogBasePath()
+        let initialCodexLogBasePath = AppSettings.codexLogBasePath()
+        let initialRefreshInterval = AppSettings.refreshInterval()
+
+        claudeLogBasePath = initialClaudeLogBasePath
+        codexLogBasePath = initialCodexLogBasePath
+        refreshInterval = initialRefreshInterval
+        claudeWatcher = ClaudeLogWatcher(basePath: initialClaudeLogBasePath, scanInterval: initialRefreshInterval)
+        codexWatcher = CodexLogWatcher(basePath: initialCodexLogBasePath, scanInterval: initialRefreshInterval)
+
+        viewModel.configure(store: store, refreshInterval: refreshInterval)
+        configureWatchers()
+        startWatchers()
+    }
+
+    func applySettings(
+        claudeLogBasePath: String,
+        codexLogBasePath: String,
+        refreshInterval: TimeInterval,
+        launchAtLogin: Bool
+    ) throws {
+        try LaunchAtLoginManager.setEnabled(launchAtLogin)
+
+        let normalizedRefreshInterval = AppSettings.clampRefreshInterval(refreshInterval)
+        let shouldRestartWatchers = self.claudeLogBasePath != claudeLogBasePath
+            || self.codexLogBasePath != codexLogBasePath
+            || self.refreshInterval != normalizedRefreshInterval
+
+        self.claudeLogBasePath = claudeLogBasePath
+        self.codexLogBasePath = codexLogBasePath
+        self.refreshInterval = normalizedRefreshInterval
+
+        viewModel.setRefreshInterval(normalizedRefreshInterval)
+
+        if shouldRestartWatchers {
+            stopWatchers()
+            claudeWatcher = ClaudeLogWatcher(basePath: claudeLogBasePath, scanInterval: normalizedRefreshInterval)
+            codexWatcher = CodexLogWatcher(basePath: codexLogBasePath, scanInterval: normalizedRefreshInterval)
+            configureWatchers()
+            startWatchers()
+            viewModel.refresh()
+        }
+    }
+
+    private func configureWatchers() {
         let refreshCallback: () -> Void = { [weak self] in
             self?.viewModel.refresh()
         }
         claudeWatcher.onUpdate = refreshCallback
         codexWatcher.onUpdate = refreshCallback
+    }
+
+    private func startWatchers() {
         claudeWatcher.start(store: store)
         codexWatcher.start(store: store)
+    }
+
+    private func stopWatchers() {
+        claudeWatcher.stop()
+        codexWatcher.stop()
     }
 }
 

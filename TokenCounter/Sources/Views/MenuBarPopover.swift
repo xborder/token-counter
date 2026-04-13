@@ -3,6 +3,7 @@ import SwiftUI
 /// Main popover view displayed when clicking the menu bar icon.
 struct MenuBarPopover: View {
     @Bindable var viewModel: MenuBarViewModel
+    let controller: AppController
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,7 +35,7 @@ struct MenuBarPopover: View {
             Divider()
 
             // Footer with variant selector
-            FooterView(viewModel: viewModel)
+            FooterView(viewModel: viewModel, controller: controller)
         }
         .frame(width: 340, height: 520)
     }
@@ -297,7 +298,10 @@ struct ComparisonVariant: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Picker("Time Range", selection: $viewModel.selectedTimeRange) {
+            Picker("Time Range", selection: Binding(
+                get: { viewModel.selectedTimeRange },
+                set: { viewModel.selectTimeRange($0) }
+            )) {
                 ForEach(TokenUsageRepository.TimeRange.allCases) { range in
                     Text(range.rawValue).tag(range)
                 }
@@ -396,6 +400,7 @@ struct SparklinesVariant: View {
 
 struct FooterView: View {
     @Bindable var viewModel: MenuBarViewModel
+    let controller: AppController
 
     var body: some View {
         VStack(spacing: 0) {
@@ -438,7 +443,7 @@ struct FooterView: View {
                 }
                 .buttonStyle(.plain)
                 .popover(isPresented: $viewModel.showSettings) {
-                    SettingsView()
+                    SettingsView(controller: controller)
                 }
 
                 Button {
