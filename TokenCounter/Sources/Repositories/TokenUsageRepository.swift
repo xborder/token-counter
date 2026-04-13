@@ -42,6 +42,8 @@ final class TokenUsageRepository {
         case all = "All"
         case claude = "Claude"
         case openai = "OpenAI"
+        case pi = "Pi CLI"
+        case opencode = "OpenCode"
 
         var id: String { rawValue }
     }
@@ -193,6 +195,10 @@ final class TokenUsageRepository {
             return turns.filter { $0.provider == Provider.claude.rawValue }
         case .openai:
             return turns.filter { $0.provider == Provider.openai.rawValue }
+        case .pi:
+            return turns.filter { $0.provider == Provider.pi.rawValue }
+        case .opencode:
+            return turns.filter { $0.provider == Provider.opencode.rawValue }
         }
     }
 }
