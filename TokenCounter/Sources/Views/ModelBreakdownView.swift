@@ -48,6 +48,7 @@ struct ModelRow: View {
                         .font(.caption)
                         .fontWeight(.medium)
                         .lineLimit(1)
+                        .help(usage.model)
 
                     Spacer()
 
@@ -82,11 +83,15 @@ struct ModelRow: View {
     }
 
     private func displayModelName(_ model: String) -> String {
-        // Shorten common prefixes
-        model
+        // Intelligently shorten model names while preserving version info
+        var name = model
             .replacingOccurrences(of: "claude-", with: "")
             .replacingOccurrences(of: "-20251001", with: "")
             .replacingOccurrences(of: "-20260410", with: "")
+
+        // For codex models, ensure version is visible (gpt-5.4, gpt-5.3-codex, etc.)
+        // For claude models, just show variant (opus, sonnet, haiku)
+        return name
     }
 }
 
@@ -104,6 +109,50 @@ struct ModelDetailRow: View {
                 .font(.caption2)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - Provider-grouped model view (for dynamic display)
+struct ProviderModelBreakdownView: View {
+    let models: [TokenUsageRepository.ModelUsage]
+
+    private var groupedByProvider: [String: [TokenUsageRepository.ModelUsage]] {
+        var grouped: [String: [TokenUsageRepository.ModelUsage]] = [:]
+        for model in models {
+            grouped[model.provider, default: []].append(model)
+        }
+        return grouped
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(groupedByProvider.keys.sorted()), id: \.self) { provider in
+                if let providerModels = groupedByProvider[provider] {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(provider == "claude" ? "Claude" : "OpenAI")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.secondary)
+
+                        ForEach(providerModels.sorted { $0.estimatedCost > $1.estimatedCost }) { usage in
+                            HStack {
+                                Text(usage.model)
+                                    .font(.caption)
+                                    .lineLimit(1)
+                                Spacer()
+                                Text(FormatHelpers.formatCost(usage.estimatedCost))
+                                    .font(.caption)
+                                    .monospacedDigit()
+                            }
+                            .padding(6)
+                            .background(.fill.tertiary)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                        }
+                    }
+                    .padding(.bottom, 4)
+                }
+            }
         }
     }
 }
