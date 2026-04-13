@@ -40,6 +40,8 @@ final class TokenStore {
 
     func hasTurn(uuid: String) -> Bool { turnIndex[uuid] != nil }
 
+    func turn(uuid: String) -> Turn? { turnIndex[uuid] }
+
     /// All turns across all sessions, sorted chronologically.
     var allTurns: [Turn] { Array(turnIndex.values) }
 

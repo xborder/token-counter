@@ -15,6 +15,7 @@ final class CodexLogWatcher {
     private(set) var isWatching = false
     private var basePath: String
     private var fileOffsets: [String: UInt64] = [:]
+    private var fileStates: [String: CodexLogParser.FileState] = [:]
     private var scanTimer: DispatchSourceTimer?
     private var store: TokenStore?
     private let costCalculator = CostCalculator()
@@ -78,10 +79,12 @@ final class CodexLogWatcher {
 
     private func parseAndIngest(filePath: String) {
         let offset = fileOffsets[filePath] ?? 0
+        let state = fileStates[filePath] ?? CodexLogParser.FileState()
         let url = URL(fileURLWithPath: filePath)
 
-        guard let result = try? CodexLogParser.parseFile(at: url, fromOffset: offset) else { return }
+        guard let result = try? CodexLogParser.parseFile(at: url, fromOffset: offset, state: state) else { return }
         fileOffsets[filePath] = result.newOffset
+        fileStates[filePath] = result.fileState
         guard !result.turns.isEmpty, let store = store else { return }
 
         var didInsert = false
@@ -97,7 +100,17 @@ final class CodexLogWatcher {
             )
 
             let turnId = "codex-\(parsedTurn.sessionId)-\(Int(parsedTurn.timestamp.timeIntervalSince1970 * 1000))"
-            guard !store.hasTurn(uuid: turnId) else { continue }
+
+            // Fix mislabeled turns: if the turn exists with model "codex" but
+            // the parser now knows the real model, update it in place.
+            if let existingTurn = store.turn(uuid: turnId) {
+                if existingTurn.model == "codex" && parsedTurn.model != "codex" {
+                    existingTurn.model = parsedTurn.model
+                    existingTurn.estimatedCostUSD = costCalculator.cost(for: existingTurn)
+                    didInsert = true
+                }
+                continue
+            }
 
             let turn = Turn(
                 uuid: turnId,
