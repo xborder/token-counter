@@ -177,20 +177,11 @@ final class ClaudeLogWatcher {
 
             var didInsert = false
             for parsedTurn in turns {
-                if let existingTurn = store.turn(uuid: parsedTurn.requestId) {
-                    existingTurn.model = parsedTurn.model
-                    existingTurn.inputTokens = parsedTurn.inputTokens
-                    existingTurn.outputTokens = parsedTurn.outputTokens
-                    existingTurn.cacheCreationTokens = parsedTurn.cacheCreationTokens
-                    existingTurn.cacheReadTokens = parsedTurn.cacheReadTokens
-                    existingTurn.cacheCreation5mTokens = parsedTurn.cacheCreation5mTokens
-                    existingTurn.cacheCreation1hTokens = parsedTurn.cacheCreation1hTokens
-                    existingTurn.isSubagent = isSubagent
-                    existingTurn.estimatedCostUSD = calculator.cost(for: existingTurn)
+                let subagentType = parsedTurn.agentId.flatMap { metaCache[$0]?.agentType }
 
-                    if let agentId = parsedTurn.agentId, let meta = metaCache[agentId] {
-                        existingTurn.subagentType = meta.agentType
-                    }
+                if let existingTurn = store.turn(uuid: parsedTurn.requestId) {
+                    self.merge(parsedTurn, into: existingTurn, isSubagent: isSubagent, subagentType: subagentType)
+                    existingTurn.estimatedCostUSD = calculator.cost(for: existingTurn)
 
                     if parsedTurn.timestamp > session.lastActivityAt { session.lastActivityAt = parsedTurn.timestamp }
                     if session.gitBranch == nil { session.gitBranch = parsedTurn.gitBranch }
@@ -215,8 +206,8 @@ final class ClaudeLogWatcher {
                 turn.isSubagent = isSubagent
                 turn.estimatedCostUSD = calculator.cost(for: turn)
 
-                if let agentId = parsedTurn.agentId, let meta = metaCache[agentId] {
-                    turn.subagentType = meta.agentType
+                if let subagentType {
+                    turn.subagentType = subagentType
                 }
 
                 store.insertTurn(turn, into: session)
@@ -239,6 +230,26 @@ final class ClaudeLogWatcher {
             applyIngestion()
         } else {
             DispatchQueue.main.sync(execute: applyIngestion)
+        }
+    }
+
+    private func merge(
+        _ parsedTurn: ClaudeLogParser.ParsedTurn,
+        into turn: Turn,
+        isSubagent: Bool,
+        subagentType: String?
+    ) {
+        turn.model = parsedTurn.model
+        turn.inputTokens = max(turn.inputTokens, parsedTurn.inputTokens)
+        turn.outputTokens = max(turn.outputTokens, parsedTurn.outputTokens)
+        turn.cacheCreationTokens = max(turn.cacheCreationTokens, parsedTurn.cacheCreationTokens)
+        turn.cacheReadTokens = max(turn.cacheReadTokens, parsedTurn.cacheReadTokens)
+        turn.cacheCreation5mTokens = max(turn.cacheCreation5mTokens, parsedTurn.cacheCreation5mTokens)
+        turn.cacheCreation1hTokens = max(turn.cacheCreation1hTokens, parsedTurn.cacheCreation1hTokens)
+        turn.isSubagent = turn.isSubagent || isSubagent
+
+        if let subagentType {
+            turn.subagentType = subagentType
         }
     }
 }
