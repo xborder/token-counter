@@ -14,6 +14,7 @@ final class ClaudeLogWatcher {
     private(set) var isWatching = false
     private var basePath: String
     private let scanInterval: TimeInterval
+    private let workQueue = DispatchQueue(label: "TokenCounter.ClaudeLogWatcher")
     private var fileOffsets: [String: UInt64] = [:]  // file path -> last parsed offset
     private var scanTimer: DispatchSourceTimer?
     private var directoryMonitor: DispatchSourceFileSystemObject?
@@ -39,7 +40,7 @@ final class ClaudeLogWatcher {
         isWatching = true
 
         // Initial full scan of all existing logs
-        Task.detached(priority: .utility) { [weak self] in
+        workQueue.async { [weak self] in
             self?.performFullScan()
             self?.startPeriodicScan()
             self?.startDirectoryMonitor()
@@ -125,75 +126,13 @@ final class ClaudeLogWatcher {
         fileOffsets[filePath] = result.newOffset
         guard !result.turns.isEmpty, let store = store else { return }
 
-        let calculator = CostCalculator()
-        let project = store.findOrCreateProject(path: projectDir)
-        let session = store.findOrCreateSession(sessionId: sessionId, in: project, firstTurn: result.turns.first)
-
-        var didInsert = false
-        for parsedTurn in result.turns {
-            if let existingTurn = store.turn(uuid: parsedTurn.requestId) {
-                existingTurn.model = parsedTurn.model
-                existingTurn.inputTokens = parsedTurn.inputTokens
-                existingTurn.outputTokens = parsedTurn.outputTokens
-                existingTurn.cacheCreationTokens = parsedTurn.cacheCreationTokens
-                existingTurn.cacheReadTokens = parsedTurn.cacheReadTokens
-                existingTurn.cacheCreation5mTokens = parsedTurn.cacheCreation5mTokens
-                existingTurn.cacheCreation1hTokens = parsedTurn.cacheCreation1hTokens
-                existingTurn.isSubagent = isSubagent
-                existingTurn.estimatedCostUSD = calculator.cost(for: existingTurn)
-
-                if let agentId = parsedTurn.agentId, let meta = subagentMetaCache[agentId] {
-                    existingTurn.subagentType = meta.agentType
-                }
-
-                if parsedTurn.timestamp > session.lastActivityAt { session.lastActivityAt = parsedTurn.timestamp }
-                if session.gitBranch == nil { session.gitBranch = parsedTurn.gitBranch }
-                if session.slug == nil { session.slug = parsedTurn.slug }
-                if session.cwd == nil { session.cwd = parsedTurn.cwd }
-                didInsert = true
-                continue
-            }
-
-            let turn = Turn(
-                uuid: parsedTurn.requestId,
-                timestamp: parsedTurn.timestamp,
-                model: parsedTurn.model,
-                provider: Provider.claude.rawValue
-            )
-            turn.inputTokens = parsedTurn.inputTokens
-            turn.outputTokens = parsedTurn.outputTokens
-            turn.cacheCreationTokens = parsedTurn.cacheCreationTokens
-            turn.cacheReadTokens = parsedTurn.cacheReadTokens
-            turn.cacheCreation5mTokens = parsedTurn.cacheCreation5mTokens
-            turn.cacheCreation1hTokens = parsedTurn.cacheCreation1hTokens
-            turn.isSubagent = isSubagent
-            turn.estimatedCostUSD = calculator.cost(for: turn)
-
-            if let agentId = parsedTurn.agentId, let meta = subagentMetaCache[agentId] {
-                turn.subagentType = meta.agentType
-            }
-
-            store.insertTurn(turn, into: session)
-
-            // Update session timestamps
-            if parsedTurn.timestamp < session.startedAt { session.startedAt = parsedTurn.timestamp }
-            if parsedTurn.timestamp > session.lastActivityAt { session.lastActivityAt = parsedTurn.timestamp }
-            if session.gitBranch == nil { session.gitBranch = parsedTurn.gitBranch }
-            if session.slug == nil { session.slug = parsedTurn.slug }
-            if session.cwd == nil { session.cwd = parsedTurn.cwd }
-            didInsert = true
-        }
-
-        if didInsert {
-            store.save()
-            DispatchQueue.main.async { self.onUpdate?() }
-        }
+        ingest(result.turns, into: store, projectDir: projectDir, sessionId: sessionId, isSubagent: isSubagent)
     }
 
     // MARK: - Periodic scanning
 
     private func startPeriodicScan() {
-        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
+        let timer = DispatchSource.makeTimerSource(queue: workQueue)
         timer.schedule(deadline: .now() + scanInterval, repeating: scanInterval)
         timer.setEventHandler { [weak self] in
             guard let self, self.isWatching else { return }
@@ -210,7 +149,7 @@ final class ClaudeLogWatcher {
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
             eventMask: [.write, .rename, .extend],
-            queue: DispatchQueue.global(qos: .utility)
+            queue: workQueue
         )
         source.setEventHandler { [weak self] in
             guard let self, self.isWatching else { return }
@@ -221,5 +160,85 @@ final class ClaudeLogWatcher {
         }
         source.resume()
         self.directoryMonitor = source
+    }
+
+    private func ingest(
+        _ turns: [ClaudeLogParser.ParsedTurn],
+        into store: TokenStore,
+        projectDir: String,
+        sessionId: String,
+        isSubagent: Bool
+    ) {
+        let metaCache = subagentMetaCache
+        let applyIngestion = {
+            let calculator = CostCalculator()
+            let project = store.findOrCreateProject(path: projectDir)
+            let session = store.findOrCreateSession(sessionId: sessionId, in: project, firstTurn: turns.first)
+
+            var didInsert = false
+            for parsedTurn in turns {
+                if let existingTurn = store.turn(uuid: parsedTurn.requestId) {
+                    existingTurn.model = parsedTurn.model
+                    existingTurn.inputTokens = parsedTurn.inputTokens
+                    existingTurn.outputTokens = parsedTurn.outputTokens
+                    existingTurn.cacheCreationTokens = parsedTurn.cacheCreationTokens
+                    existingTurn.cacheReadTokens = parsedTurn.cacheReadTokens
+                    existingTurn.cacheCreation5mTokens = parsedTurn.cacheCreation5mTokens
+                    existingTurn.cacheCreation1hTokens = parsedTurn.cacheCreation1hTokens
+                    existingTurn.isSubagent = isSubagent
+                    existingTurn.estimatedCostUSD = calculator.cost(for: existingTurn)
+
+                    if let agentId = parsedTurn.agentId, let meta = metaCache[agentId] {
+                        existingTurn.subagentType = meta.agentType
+                    }
+
+                    if parsedTurn.timestamp > session.lastActivityAt { session.lastActivityAt = parsedTurn.timestamp }
+                    if session.gitBranch == nil { session.gitBranch = parsedTurn.gitBranch }
+                    if session.slug == nil { session.slug = parsedTurn.slug }
+                    if session.cwd == nil { session.cwd = parsedTurn.cwd }
+                    didInsert = true
+                    continue
+                }
+
+                let turn = Turn(
+                    uuid: parsedTurn.requestId,
+                    timestamp: parsedTurn.timestamp,
+                    model: parsedTurn.model,
+                    provider: Provider.claude.rawValue
+                )
+                turn.inputTokens = parsedTurn.inputTokens
+                turn.outputTokens = parsedTurn.outputTokens
+                turn.cacheCreationTokens = parsedTurn.cacheCreationTokens
+                turn.cacheReadTokens = parsedTurn.cacheReadTokens
+                turn.cacheCreation5mTokens = parsedTurn.cacheCreation5mTokens
+                turn.cacheCreation1hTokens = parsedTurn.cacheCreation1hTokens
+                turn.isSubagent = isSubagent
+                turn.estimatedCostUSD = calculator.cost(for: turn)
+
+                if let agentId = parsedTurn.agentId, let meta = metaCache[agentId] {
+                    turn.subagentType = meta.agentType
+                }
+
+                store.insertTurn(turn, into: session)
+
+                if parsedTurn.timestamp < session.startedAt { session.startedAt = parsedTurn.timestamp }
+                if parsedTurn.timestamp > session.lastActivityAt { session.lastActivityAt = parsedTurn.timestamp }
+                if session.gitBranch == nil { session.gitBranch = parsedTurn.gitBranch }
+                if session.slug == nil { session.slug = parsedTurn.slug }
+                if session.cwd == nil { session.cwd = parsedTurn.cwd }
+                didInsert = true
+            }
+
+            if didInsert {
+                store.save()
+                self.onUpdate?()
+            }
+        }
+
+        if Thread.isMainThread {
+            applyIngestion()
+        } else {
+            DispatchQueue.main.sync(execute: applyIngestion)
+        }
     }
 }
