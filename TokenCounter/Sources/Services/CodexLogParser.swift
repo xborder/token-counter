@@ -87,23 +87,34 @@ struct CodexLogParser {
 
     // MARK: - Parsing
 
+    /// State carried across incremental reads of the same file.
+    struct FileState {
+        var model: String = "codex"
+        var cwd: String = ""
+        var projectPath: String = "codex"
+        var previousTotal: LogEvent.TokenUsage? = nil
+    }
+
     /// Parse a Codex rollout JSONL file and return per-turn token usage.
     ///
     /// For each `token_count` event:
     /// - If `last_token_usage` is present, use it directly (per-turn delta)
     /// - Otherwise, compute delta from consecutive `total_token_usage` snapshots
-    static func parseFile(at url: URL, fromOffset offset: UInt64 = 0) throws -> (turns: [ParsedTurn], newOffset: UInt64) {
+    ///
+    /// Pass the returned `fileState` back on subsequent incremental reads so
+    /// that the model name (from `turn_context` events seen earlier) carries over.
+    static func parseFile(at url: URL, fromOffset offset: UInt64 = 0, state: FileState = FileState()) throws -> (turns: [ParsedTurn], newOffset: UInt64, fileState: FileState) {
         let fileHandle = try FileHandle(forReadingFrom: url)
         defer { try? fileHandle.close() }
 
         let fileSize = fileHandle.seekToEndOfFile()
         guard fileSize > offset else {
-            return ([], fileSize)
+            return ([], fileSize, state)
         }
 
         fileHandle.seek(toFileOffset: offset)
         guard let data = try? fileHandle.readToEnd(), !data.isEmpty else {
-            return ([], fileSize)
+            return ([], fileSize, state)
         }
 
         let lines = data.split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: true)
@@ -114,10 +125,10 @@ struct CodexLogParser {
         let sessionDate = extractSessionDate(from: url.pathComponents)
 
         var turns: [ParsedTurn] = []
-        var previousTotal: LogEvent.TokenUsage?
-        var currentModel = "codex"
-        var currentCwd = ""
-        var projectPath = "codex"  // Default fallback
+        var previousTotal = state.previousTotal
+        var currentModel = state.model
+        var currentCwd = state.cwd
+        var projectPath = state.projectPath
 
         for lineData in lines {
             guard let event = try? decoder.decode(LogEvent.self, from: Data(lineData)) else {
@@ -193,7 +204,13 @@ struct CodexLogParser {
             previousTotal = info.totalTokenUsage
         }
 
-        return (turns, fileSize)
+        let finalState = FileState(
+            model: currentModel,
+            cwd: currentCwd,
+            projectPath: projectPath,
+            previousTotal: previousTotal
+        )
+        return (turns, fileSize, finalState)
     }
 
     private static func extractSessionDate(from components: [String]) -> String {

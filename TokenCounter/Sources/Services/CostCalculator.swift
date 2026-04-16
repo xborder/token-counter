@@ -10,89 +10,59 @@ struct CostCalculator {
         let outputPricePer1M: Double
         let cacheCreationPricePer1M: Double
         let cacheReadPricePer1M: Double
+        let cacheCreation1hPricePer1M: Double
+
+        init(
+            inputPricePer1M: Double,
+            outputPricePer1M: Double,
+            cacheCreationPricePer1M: Double,
+            cacheReadPricePer1M: Double,
+            cacheCreation1hPricePer1M: Double? = nil
+        ) {
+            self.inputPricePer1M = inputPricePer1M
+            self.outputPricePer1M = outputPricePer1M
+            self.cacheCreationPricePer1M = cacheCreationPricePer1M
+            self.cacheReadPricePer1M = cacheReadPricePer1M
+            self.cacheCreation1hPricePer1M = cacheCreation1hPricePer1M ?? cacheCreationPricePer1M
+        }
+    }
+
+    struct CostBreakdown {
+        let input: Double
+        let output: Double
+        let cacheCreation: Double
+        let cacheRead: Double
+        let reasoning: Double
+
+        var total: Double {
+            input + output + cacheCreation + cacheRead
+        }
     }
 
     /// Default bundled pricing for known models.
-    static let bundledPricing: [String: ModelPricing] = [
-        // Claude models
-        "claude-opus-4-6": ModelPricing(
-            inputPricePer1M: 15.0,
-            outputPricePer1M: 75.0,
-            cacheCreationPricePer1M: 18.75,
-            cacheReadPricePer1M: 1.50
-        ),
-        "claude-sonnet-4-6": ModelPricing(
-            inputPricePer1M: 3.0,
-            outputPricePer1M: 15.0,
-            cacheCreationPricePer1M: 3.75,
-            cacheReadPricePer1M: 0.30
-        ),
-        "claude-haiku-4-5-20251001": ModelPricing(
-            inputPricePer1M: 0.80,
-            outputPricePer1M: 4.0,
-            cacheCreationPricePer1M: 1.0,
-            cacheReadPricePer1M: 0.08
-        ),
-        // OpenAI models
-        "o3": ModelPricing(
-            inputPricePer1M: 2.0,
-            outputPricePer1M: 8.0,
-            cacheCreationPricePer1M: 0,
-            cacheReadPricePer1M: 0
-        ),
-        "o4-mini": ModelPricing(
-            inputPricePer1M: 1.10,
-            outputPricePer1M: 4.40,
-            cacheCreationPricePer1M: 0,
-            cacheReadPricePer1M: 0
-        ),
-        "gpt-4o": ModelPricing(
-            inputPricePer1M: 2.50,
-            outputPricePer1M: 10.0,
-            cacheCreationPricePer1M: 0,
-            cacheReadPricePer1M: 1.25
-        ),
-        "gpt-4o-mini": ModelPricing(
-            inputPricePer1M: 0.15,
-            outputPricePer1M: 0.60,
-            cacheCreationPricePer1M: 0,
-            cacheReadPricePer1M: 0.075
-        ),
-        // Codex CLI models
-        "codex": ModelPricing(
-            inputPricePer1M: 2.50,
-            outputPricePer1M: 10.0,
-            cacheCreationPricePer1M: 0,
-            cacheReadPricePer1M: 1.25
-        ),
-        "codex-mini": ModelPricing(
-            inputPricePer1M: 0.15,
-            outputPricePer1M: 0.60,
-            cacheCreationPricePer1M: 0,
-            cacheReadPricePer1M: 0.075
-        ),
-        "gpt-5.4": ModelPricing(
-            inputPricePer1M: 2.50,
-            outputPricePer1M: 15.0,
-            cacheCreationPricePer1M: 0,
-            cacheReadPricePer1M: 0.25
-        ),
-        "gpt-5.3-codex": ModelPricing(
-            inputPricePer1M: 1.75,
-            outputPricePer1M: 14.0,
-            cacheCreationPricePer1M: 0,
-            cacheReadPricePer1M: 0.175
-        ),
-        "gpt-5.2-codex": ModelPricing(
-            inputPricePer1M: 1.75,
-            outputPricePer1M: 14.0,
-            cacheCreationPricePer1M: 0,
-            cacheReadPricePer1M: 0.175
-        ),
-    ]
+    static let bundledPricing: [String: ModelPricing] = loadBundledPricing()
 
     /// User overrides loaded from settings (model -> pricing).
     var userOverrides: [String: ModelPricing] = [:]
+
+    private static func loadBundledPricing() -> [String: ModelPricing] {
+        guard let url = Bundle.module.url(forResource: "pricing", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let config = try? JSONDecoder().decode(PricingConfig.self, from: data) else {
+            assertionFailure("Unable to load bundled pricing.json")
+            return [:]
+        }
+
+        return config.models.reduce(into: [:]) { result, entry in
+            result[entry.key] = ModelPricing(
+                inputPricePer1M: entry.value.input,
+                outputPricePer1M: entry.value.output,
+                cacheCreationPricePer1M: entry.value.cacheCreation,
+                cacheReadPricePer1M: entry.value.cacheRead,
+                cacheCreation1hPricePer1M: entry.value.cacheCreation1h
+            )
+        }
+    }
 
     /// Look up pricing for a model, checking user overrides first, then bundled.
     func pricing(for model: String) -> ModelPricing? {
@@ -111,16 +81,27 @@ struct CostCalculator {
         return nil
     }
 
-    /// Calculate the cost in USD for a single turn.
-    func cost(for turn: Turn) -> Double {
-        guard let pricing = pricing(for: turn.model) else { return 0 }
+    func costBreakdown(for turn: Turn) -> CostBreakdown? {
+        guard let pricing = pricing(for: turn.model) else { return nil }
 
         let inputCost = Double(turn.inputTokens) * pricing.inputPricePer1M / 1_000_000.0
         let outputCost = Double(turn.outputTokens) * pricing.outputPricePer1M / 1_000_000.0
-        let cacheCreateCost = Double(turn.cacheCreationTokens) * pricing.cacheCreationPricePer1M / 1_000_000.0
+        let cacheCreateCost = cacheCreationCost(for: turn, pricing: pricing)
         let cacheReadCost = Double(turn.cacheReadTokens) * pricing.cacheReadPricePer1M / 1_000_000.0
+        let reasoningCost = Double(turn.reasoningTokens) * pricing.outputPricePer1M / 1_000_000.0
 
-        return inputCost + outputCost + cacheCreateCost + cacheReadCost
+        return CostBreakdown(
+            input: inputCost,
+            output: outputCost,
+            cacheCreation: cacheCreateCost,
+            cacheRead: cacheReadCost,
+            reasoning: reasoningCost
+        )
+    }
+
+    /// Calculate the cost in USD for a single turn.
+    func cost(for turn: Turn) -> Double {
+        costBreakdown(for: turn)?.total ?? 0
     }
 
     /// Calculate how much money was saved by cache hits vs full-price input.
@@ -138,5 +119,18 @@ struct CostCalculator {
         for turn in turns {
             turn.estimatedCostUSD = cost(for: turn)
         }
+    }
+
+    private func cacheCreationCost(for turn: Turn, pricing: ModelPricing) -> Double {
+        let classifiedTokens = turn.cacheCreation5mTokens + turn.cacheCreation1hTokens
+        if classifiedTokens == 0 {
+            return Double(turn.cacheCreationTokens) * pricing.cacheCreationPricePer1M / 1_000_000.0
+        }
+
+        let unclassifiedTokens = max(0, turn.cacheCreationTokens - classifiedTokens)
+        let fiveMinuteTokens = turn.cacheCreation5mTokens + unclassifiedTokens
+
+        return Double(fiveMinuteTokens) * pricing.cacheCreationPricePer1M / 1_000_000.0
+            + Double(turn.cacheCreation1hTokens) * pricing.cacheCreation1hPricePer1M / 1_000_000.0
     }
 }

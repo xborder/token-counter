@@ -1,6 +1,62 @@
 import Foundation
 import SwiftUI
 
+/// UI variants for the menu bar popover.
+enum UIVariant: Int, CaseIterable, Identifiable {
+    case classic = 0           // Current layout: header → breakdown → models → sessions
+    case compact = 1           // Dense cards, minimal spacing
+    case minimal = 2           // Only cost and tokens, hide breakdown details
+    case tabbed = 3            // Tabs: Summary | Breakdown | Models | Sessions
+    case cardGrid = 4          // Dashboard with large metric cards
+    case treeOnly = 5          // Full session tree, no breakdown
+    case costFocused = 6       // Emphasize cost breakdown, de-emphasize tokens
+    case timelineView = 7      // Sessions as chronological timeline
+    case comparison = 8        // Side-by-side comparison of providers
+    case sparklines = 9        // Sparkline charts for trends
+
+    var id: Int { rawValue }
+
+    var name: String {
+        switch self {
+        case .classic: return "Classic"
+        case .compact: return "Compact"
+        case .minimal: return "Minimal"
+        case .tabbed: return "Tabbed"
+        case .cardGrid: return "Card Grid"
+        case .treeOnly: return "Tree Only"
+        case .costFocused: return "Cost Focused"
+        case .timelineView: return "Timeline"
+        case .comparison: return "Comparison"
+        case .sparklines: return "Sparklines"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .classic:
+            return "Current layout: Header → Breakdown → Models → Sessions"
+        case .compact:
+            return "Dense cards with minimal spacing for more data"
+        case .minimal:
+            return "Only total cost and tokens, hide details"
+        case .tabbed:
+            return "Tabbed interface: Summary | Breakdown | Models | Sessions"
+        case .cardGrid:
+            return "Dashboard with large metric cards"
+        case .treeOnly:
+            return "Full session tree without breakdown analysis"
+        case .costFocused:
+            return "Emphasize cost breakdown over token details"
+        case .timelineView:
+            return "Sessions displayed as chronological timeline"
+        case .comparison:
+            return "Side-by-side comparison of Claude vs OpenAI"
+        case .sparklines:
+            return "Mini charts showing token/cost trends"
+        }
+    }
+}
+
 /// ViewModel for the menu bar popover. Drives all UI state.
 @Observable
 final class MenuBarViewModel {
@@ -17,17 +73,21 @@ final class MenuBarViewModel {
     var expandedSessions: Set<String> = []
     var lastUpdated: Date = Date()
     var showSettings = false
+    var selectedUIVariant: UIVariant = .classic
+    var showVariantSelector = false
 
     // MARK: - Dependencies
 
     private var repository: TokenUsageRepository?
     private var costCalculator = CostCalculator()
     private var refreshTimer: Timer?
+    private var refreshInterval: TimeInterval = AppSettings.defaultRefreshInterval
 
     // MARK: - Setup
 
-    func configure(store: TokenStore) {
+    func configure(store: TokenStore, refreshInterval: TimeInterval = AppSettings.defaultRefreshInterval) {
         self.repository = TokenUsageRepository(store: store)
+        self.refreshInterval = AppSettings.clampRefreshInterval(refreshInterval)
         refresh()
         startAutoRefresh()
     }
@@ -51,6 +111,11 @@ final class MenuBarViewModel {
     func selectProvider(_ provider: TokenUsageRepository.ProviderFilter) {
         selectedProvider = provider
         refresh()
+    }
+
+    func setRefreshInterval(_ interval: TimeInterval) {
+        refreshInterval = AppSettings.clampRefreshInterval(interval)
+        startAutoRefresh()
     }
 
     func toggleModel(_ model: String) {
@@ -90,7 +155,8 @@ final class MenuBarViewModel {
     // MARK: - Auto-refresh
 
     private func startAutoRefresh() {
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        refreshTimer?.invalidate()
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
             self?.refresh()
         }
     }

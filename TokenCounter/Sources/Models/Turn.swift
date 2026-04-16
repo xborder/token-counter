@@ -69,7 +69,7 @@ final class Turn: Codable, Identifiable {
 
     /// Total input tokens including all cache types.
     /// For Claude: input_tokens + cache_creation_input_tokens + cache_read_input_tokens
-    /// For OpenAI: inputTokens includes prompt_tokens (which contains cached)
+    /// For OpenAI: inputTokens is uncached input, so cached reads are added back here
     var totalInputTokens: Int {
         inputTokens + cacheCreationTokens + cacheReadTokens
     }
